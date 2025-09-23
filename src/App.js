@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import PeerConnect from "./components/PeerConnect";
 import "./App.css";
+import PeerConnect from "./components/PeerConnect";
 
 function App() {
     const [logMessages, setLogMessages] = useState([]);
@@ -15,14 +15,18 @@ function App() {
                 <h1>FileTransfer-Web-IOS-Android</h1>
             </header>
 
-            <div className="App-content">
+            <main className="App-content">
                 <PeerConnect pushLog={pushLog} />
-            </div>
+            </main>
 
-            {/* Bottom log as static footer */}
-            <div className="App-log">
-
-            </div>
+            <footer className="App-footer">
+        <textarea
+            readOnly
+            className="App-log"
+            value={logMessages.join("\n")}
+            placeholder="Logs will appear here..."
+        />
+            </footer>
         </div>
     );
 }

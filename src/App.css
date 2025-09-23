@@ -1,33 +1,81 @@
+/* Root container */
 .App {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   width: 100%;
-  overflow-x: hidden;
+  text-align: center;
   font-family: 'Segoe UI', Roboto, sans-serif;
-  background-color: #121212; /* dark background for whole app */
+  background-color: #121212;
   color: #ffffff;
-  min-height: 100vh;
   box-sizing: border-box;
+  padding: 0.5rem; /* unified margin for all sections */
+  gap: 0.5rem; /* consistent spacing between header, content, footer */
 }
 
+/* Header */
 .App-header {
-  background-color: #282c34; /* darker header */
-  width: 100%;
-  padding: 1.5rem 1rem; /* reduced padding */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  background-color: #1f1f1f;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #333; /* consistent border */
+  width: 100%;
   box-sizing: border-box;
 }
 
-h1 {
-  font-size: 1.5rem; /* smaller for mobile */
-  margin: 0;
-  text-align: center;
+/* Content */
+.App-content {
+  flex: 1; /* fill remaining space */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1f1f1f; /* same dark section style */
+  border-radius: 8px;
+  border: 1px solid #333; /* consistent border with header/footer */
+  width: 100%;
+  box-sizing: border-box;
 }
 
+/* Footer with scrollable log textarea */
+.App-footer {
+  flex: 0 0 20%; /* fixed footer height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background-color: #1f1f1f;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Log textarea */
+.App-log {
+  width: 100%;
+  height: 100%;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem;
+  resize: none;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Headline */
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+/* Existing styles remain untouched */
 .App-logo {
   height: 40vmin;
   pointer-events: none;
@@ -61,15 +109,23 @@ h1 {
 
 /* Mobile adjustments */
 @media (max-width: 480px) {
+
   .App-header {
-    padding: 1rem 0.5rem;
+    flex-direction: row; /* keep in a single line */
+    justify-content: center;
+    align-items: center; /* center vertically */
+    padding: 0.25rem 0.5rem; /* reduce vertical padding */
+    min-height: 40px; /* optional: enforce small height */
   }
 
   h1 {
-    font-size: 1.25rem; /* even smaller on very small screens */
+    font-size: 1rem; /* smaller to fit in one line */
+    margin: 0;
   }
 
-  .App-logo {
-    height: 25vmin;
+  .App-log {
+    font-size: 0.85rem;
+    padding: 0.4rem;
   }
 }
+

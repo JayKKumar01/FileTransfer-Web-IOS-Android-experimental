@@ -1,0 +1,74 @@
+/* Root container fills parent */
+.PeerConnect {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%; /* takes full height allocated by parent */
+    width: 100%; /* fills parent width */
+    box-sizing: border-box;
+    padding: 1rem;
+    background-color: #1a1a1a; /* slightly lighter dark background */
+    border-radius: 12px; /* subtle rounding */
+    color: #ffffff;
+    overflow: hidden;
+}
+
+/* Your ID display */
+.PeerConnect p {
+    margin: 0 0 1rem 0;
+    font-weight: 500;
+    font-size: 1rem;
+    word-break: break-word;
+}
+
+/* Input field */
+.PeerConnect input {
+    width: 80%;
+    max-width: 250px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background-color: #121212;
+    color: #ffffff;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.PeerConnect input::placeholder {
+    color: #888;
+}
+
+/* Connect button */
+.PeerConnect button {
+    padding: 0.55rem 1.2rem;
+    border-radius: 8px;
+    border: none;
+    background-color: #2575fc;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.PeerConnect button:hover {
+    background-color: #1a5edb;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 480px) {
+    .PeerConnect {
+        padding: 0.8rem;
+    }
+
+    .PeerConnect input {
+        width: 90%;
+        font-size: 0.95rem;
+    }
+
+    .PeerConnect button {
+        font-size: 0.95rem;
+        padding: 0.5rem 1rem;
+    }
+}

@@ -12,20 +12,20 @@ export const PeerProvider = ({ children }) => {
     const peerRef = useRef(null);
     const [peerId] = useState(RANDOM_ID);
     const [connection, setConnection] = useState(null);
-    const [isPeerReady, setIsPeerReady] = useState(false); // ⬅️ NEW state for loading
+    const [isPeerReady, setIsPeerReady] = useState(false);
 
     const log = (msg) => {
         console.log(msg);
         pushLog && pushLog(msg);
     };
 
-    useEffect(() => {
+    const initializePeer = () => {
         const peer = new Peer(PREFIX + peerId);
         peerRef.current = peer;
 
         peer.on("open", (id) => {
             log(`Peer opened with ID: ${id.replace(PREFIX, "")}`);
-            setIsPeerReady(true); // ✅ Peer is ready now
+            setIsPeerReady(true);
         });
 
         peer.on("connection", (incomingConn) => {
@@ -34,11 +34,20 @@ export const PeerProvider = ({ children }) => {
             setupConnection(incomingConn);
         });
 
-        peer.on("disconnected", () => log("Disconnected from peer."));
-        peer.on("close", () => log("Peer closed."));
+        // ✅ Only reconnect on actual disconnect
+        peer.on("disconnected", () => {
+            log("Peer disconnected...");
+            setIsPeerReady(false);
+        });
 
-        return () => peer.destroy();
-    }, []);
+        peer.on("close", () => log("Peer closed – please refresh the homepage to reconnect."));
+        peer.on("error", (err) => log(`Peer error: ${err}`));
+    };
+
+    useEffect(() => {
+        initializePeer();
+        return () => peerRef.current?.destroy();
+    }, [peerId]);
 
     const setupConnection = (conn) => {
         setConnection(conn);
@@ -60,6 +69,18 @@ export const PeerProvider = ({ children }) => {
         setupConnection(conn);
     };
 
+    // Expose reconnect method to App.js if needed
+    const reconnect = () => {
+        if (!peerRef.current || peerRef.current.destroyed) {
+            log("Peer is destroyed – please refresh the homepage to reconnect.");
+        } else if (peerRef.current.disconnected) {
+            log("Peer disconnected – attempting to reconnect...");
+            peerRef.current.reconnect();
+        } else {
+            log("Peer is active – no reconnect needed.");
+        }
+    };
+
     return (
         <PeerContext.Provider
             value={{
@@ -67,7 +88,8 @@ export const PeerProvider = ({ children }) => {
                 peerId,
                 connection,
                 connectToPeer,
-                isPeerReady, // ⬅️ Expose to consumers
+                reconnect,
+                isPeerReady,
             }}
         >
             {children}

@@ -15,25 +15,21 @@ function App() {
         }
     }, [logMessages]);
 
-    // Handle wake lock using the plain JS module
     useEffect(() => {
-        // Wrapper callback to push logs
-        const handleWakeLockStatus = ({ status, error }) => {
-            if (status === "error") {
-                pushLog(`WakeLock error: ${error?.message || error}`);
-            } else {
-                pushLog(`WakeLock status: ${status}`);
-            }
-        };
-
-        // Request wake lock on mount
-        requestWakeLock(handleWakeLockStatus);
+        // Request wake lock when the component mounts
+        requestWakeLock(({ status, error }) => {
+            if (error) pushLog(`WakeLock error: ${error.message || error}`);
+            else pushLog(`WakeLock status: ${status}`);
+        });
 
         // Release wake lock on unmount
         return () => {
-            releaseWakeLock(handleWakeLockStatus);
+            releaseWakeLock(({ status, error }) => {
+                if (error) pushLog(`WakeLock release error: ${error.message || error}`);
+                else pushLog(`WakeLock released: ${status}`);
+            });
         };
-    }, [pushLog]); // pushLog is stable because of useCallback in context
+    }, []);
 
     return (
         <div className="App">

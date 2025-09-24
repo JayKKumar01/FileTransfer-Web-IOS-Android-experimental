@@ -3,26 +3,29 @@ import "./App.css";
 import PeerConnect from "./components/PeerConnect";
 import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
+import { isIOS, preventPinchZoom, setVisibleHeight } from "./utils/osUtil";
 
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
     const logRef = useRef(null);
-    const { wakeLockActive, requestUserWakeLock, isIOS } = useWakeLock();
+    const { wakeLockActive, requestUserWakeLock } = useWakeLock();
 
-    // ✅ Set CSS variable for visible height
+    // ✅ Handle visible height on portrait mode
     useEffect(() => {
-        const setAppHeight = () => {
-            const visibleHeight = window.innerHeight;
-            document.documentElement.style.setProperty('--app-height', `${visibleHeight}px`);
-            pushLog && pushLog(`📏 App height updated: ${visibleHeight}px`); // log height change
-            console.log(`[App] Visible height set: ${visibleHeight}px`);
-        };
+        const updateHeight = () => setVisibleHeight(pushLog);
 
-        setAppHeight();
-        window.addEventListener('resize', setAppHeight);
+        updateHeight();
+        window.addEventListener("resize", updateHeight);
 
-        return () => window.removeEventListener('resize', setAppHeight);
+        return () => window.removeEventListener("resize", updateHeight);
     }, [pushLog]);
+
+    // ✅ Enable iOS pinch/zoom prevention
+    useEffect(() => {
+        const cleanup = preventPinchZoom(pushLog);
+        return () => cleanup?.();
+    }, []);
+
 
     // Scroll to bottom whenever logMessages change
     useEffect(() => {

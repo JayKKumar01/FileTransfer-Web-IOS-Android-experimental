@@ -2,14 +2,11 @@ import React, { useContext, useEffect, useRef } from "react";
 import "./App.css";
 import PeerConnect from "./components/PeerConnect";
 import { LogContext } from "./contexts/LogContext";
-import { useWakeLock } from "./utils/wakeLock";
+import { requestWakeLock, releaseWakeLock } from "./utils/wakeLock";
 
 function App() {
-    const { logMessages } = useContext(LogContext);
+    const { logMessages, pushLog } = useContext(LogContext);
     const logRef = useRef(null);
-
-    // Automatically handles wake lock and logs
-    useWakeLock();
 
     // Scroll to the bottom whenever logMessages change
     useEffect(() => {
@@ -17,6 +14,26 @@ function App() {
             logRef.current.scrollTop = logRef.current.scrollHeight;
         }
     }, [logMessages]);
+
+    // Handle wake lock using the plain JS module
+    useEffect(() => {
+        // Wrapper callback to push logs
+        const handleWakeLockStatus = ({ status, error }) => {
+            if (status === "error") {
+                pushLog(`WakeLock error: ${error?.message || error}`);
+            } else {
+                pushLog(`WakeLock status: ${status}`);
+            }
+        };
+
+        // Request wake lock on mount
+        requestWakeLock(handleWakeLockStatus);
+
+        // Release wake lock on unmount
+        return () => {
+            releaseWakeLock(handleWakeLockStatus);
+        };
+    }, [pushLog]); // pushLog is stable because of useCallback in context
 
     return (
         <div className="App">
@@ -26,7 +43,6 @@ function App() {
 
             <main className="App-content">
                 <PeerConnect />
-                {/* Other components can also log messages via context */}
             </main>
 
             <footer className="App-footer">

@@ -1,73 +1,75 @@
-import { useContext, useEffect, useRef } from "react";
-import { LogContext } from "../contexts/LogContext";
+let wakeLock = null;
+let retryInterval = null;
 
-export function useWakeLock() {
-    const { pushLog } = useContext(LogContext);
-    const wakeLockRef = useRef(null);
-    const retryIntervalRef = useRef(null);
-    const isAcquiringRef = useRef(false);
+/**
+ * Request a screen wake lock to prevent the device from sleeping.
+ * Automatically tries to reacquire on visibility change (iOS & Chrome).
+ * @param {Function} onStatusChange Optional callback: receives { status, error }
+ */
+export async function requestWakeLock(onStatusChange) {
+    try {
+        if ('wakeLock' in navigator) {
+            // Function to request the lock
+            const acquireLock = async () => {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    if (onStatusChange) onStatusChange({ status: 'active' });
 
-    useEffect(() => {
-        let isUnmounted = false;
-
-        const acquireLock = async () => {
-            if (!("wakeLock" in navigator)) {
-                if (!isUnmounted) pushLog && pushLog("WakeLock unsupported");
-                return;
-            }
-            if (wakeLockRef.current || isAcquiringRef.current) return;
-
-            isAcquiringRef.current = true;
-            try {
-                wakeLockRef.current = await navigator.wakeLock.request("screen");
-                if (!isUnmounted) pushLog && pushLog("WakeLock acquired");
-
-                wakeLockRef.current.addEventListener("release", () => {
-                    wakeLockRef.current = null;
-                    if (!isUnmounted) pushLog && pushLog("WakeLock released");
-                });
-            } catch (err) {
-                wakeLockRef.current = null;
-                if (!isUnmounted) pushLog && pushLog(`WakeLock error: ${err.message || err}`);
-            } finally {
-                isAcquiringRef.current = false;
-            }
-        };
-
-        const handleVisibilityChange = async () => {
-            if (document.visibilityState === "visible") {
-                await acquireLock();
-                if (!isUnmounted) pushLog && pushLog("WakeLock reacquired (visibility change)");
-            }
-        };
-
-        acquireLock();
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-
-        if (!retryIntervalRef.current) {
-            retryIntervalRef.current = setInterval(async () => {
-                if (!wakeLockRef.current) {
-                    await acquireLock();
-                    if (!isUnmounted) pushLog && pushLog("WakeLock reacquired (retry)");
+                    // Handle release (reacquire automatically)
+                    wakeLock.addEventListener('release', () => {
+                        if (onStatusChange) onStatusChange({ status: 'released' });
+                    });
+                } catch (err) {
+                    if (onStatusChange) onStatusChange({ status: 'error', error: err });
                 }
-            }, 5000);
+            };
+
+            await acquireLock();
+
+            // Re-acquire on visibility change
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState === 'visible') {
+                    await acquireLock();
+                    if (onStatusChange) onStatusChange({ status: 'reacquired' });
+                }
+            });
+
+            // Safari/iOS may drop wake lock when tab is backgrounded
+            // Retry every few seconds as a fallback
+            if (!retryInterval) {
+                retryInterval = setInterval(async () => {
+                    if (wakeLock === null && document.visibilityState === 'visible') {
+                        await acquireLock();
+                        if (onStatusChange) onStatusChange({ status: 'reacquired' });
+                    }
+                }, 5000); // retry every 5 seconds
+            }
+
+        } else {
+            if (onStatusChange) onStatusChange({ status: 'unsupported' });
         }
+    } catch (err) {
+        if (onStatusChange) onStatusChange({ status: 'error', error: err });
+    }
+}
 
-        return () => {
-            isUnmounted = true;
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
+/**
+ * Release the wake lock manually.
+ */
+export async function releaseWakeLock(onStatusChange) {
+    if (wakeLock !== null) {
+        try {
+            await wakeLock.release();
+            wakeLock = null;
+            if (onStatusChange) onStatusChange({ status: 'released' });
+        } catch (err) {
+            if (onStatusChange) onStatusChange({ status: 'error', error: err });
+        }
+    }
 
-            if (wakeLockRef.current) {
-                wakeLockRef.current.release().finally(() => {
-                    wakeLockRef.current = null;
-                    // No pushLog here to avoid infinite re-renders
-                });
-            }
-
-            if (retryIntervalRef.current) {
-                clearInterval(retryIntervalRef.current);
-                retryIntervalRef.current = null;
-            }
-        };
-    }, [pushLog]);
+    // Clear retry interval
+    if (retryInterval) {
+        clearInterval(retryInterval);
+        retryInterval = null;
+    }
 }

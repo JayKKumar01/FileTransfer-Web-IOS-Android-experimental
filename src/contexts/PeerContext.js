@@ -12,7 +12,9 @@ export const PeerProvider = ({ children }) => {
     const peerRef = useRef(null);
     const [peerId] = useState(RANDOM_ID);
     const [connection, setConnection] = useState(null);
+    const [remoteId, setRemoteId] = useState(null); // new state
     const [isPeerReady, setIsPeerReady] = useState(false);
+    const [isConnectionReady, setIsConnectionReady] = useState(false); // new state
 
     const log = (msg) => {
         console.log(msg);
@@ -38,6 +40,7 @@ export const PeerProvider = ({ children }) => {
         peer.on("disconnected", () => {
             log("Peer disconnected...");
             setIsPeerReady(false);
+            peerRef.current.reconnect();
         });
 
         peer.on("close", () => log("Peer closed – please refresh the homepage to reconnect."));
@@ -51,10 +54,13 @@ export const PeerProvider = ({ children }) => {
 
     const setupConnection = (conn) => {
         setConnection(conn);
+        setIsConnectionReady(false); // reset until open
 
         conn.on("open", () => {
             const remoteId = conn.peer.replace(PREFIX, "");
             log(`Connected to ${remoteId}`);
+            setRemoteId(remoteId); // store remote peer ID
+            setIsConnectionReady(true); // mark connection as ready
         });
 
         conn.on("data", (data) => log(`Received data: ${JSON.stringify(data)}`));
@@ -62,47 +68,51 @@ export const PeerProvider = ({ children }) => {
         conn.on("error", (err) => log(`Data connection error: ${err}`));
     };
 
-    // ✅ Simple retry logic with callback
     const connectToPeer = (targetId, callback) => {
         if (!targetId || !peerRef.current) return;
 
-        let attempts = 0;
+        log(`Trying to connect with ID: ${targetId}`);
+
         const maxRetries = 3;
         const retryInterval = 2000;
+        let attempts = 0;
+        let connRef = null;
 
         const attemptConnection = () => {
             if (!peerRef.current || peerRef.current.destroyed) {
-                log(`Cannot connect – peer is destroyed.`);
-                callback && callback("failed");
+                log("Cannot connect – peer is destroyed.");
+                callback?.("failed");
                 return;
             }
 
-            const conn = peerRef.current.connect(PREFIX + targetId, { reliable: true });
+            // Close stale connection
+            connRef?.close();
 
-            conn.on("open", () => {
-                log(`Connected to ${targetId}`);
-                setConnection(conn);
-                callback && callback("connected");
-            });
+            // Create new connection
+            connRef = peerRef.current.connect(PREFIX + targetId, { reliable: true });
 
-            conn.on("error", () => {
-                attempts++;
-                if (attempts < maxRetries) {
-                    log(`Connection error to ${targetId}, retrying... (${attempts}/${maxRetries})`);
-                    callback && callback("retrying");
-                    setTimeout(attemptConnection, retryInterval);
-                } else {
-                    log(`Failed to connect to ${targetId} – peer may be unavailable or ID invalid.`);
-                    callback && callback("failed");
+            setupConnection(connRef);
+
+            // Wait 2 seconds and check if connection is open
+            setTimeout(() => {
+                if (!connRef?.open) {
+                    attempts++;
+                    if (attempts < maxRetries) {
+                        callback?.(`Retrying... (${attempts}/${maxRetries})`);
+                        setTimeout(attemptConnection, retryInterval);
+                    } else {
+                        log(`Failed to connect to ${targetId} – peer may be unavailable or ID invalid.`);
+                        callback?.("failed");
+                    }
                 }
-            });
-
-            conn.on("close", () => log("Data connection closed."));
-            conn.on("data", (data) => log(`Received data: ${JSON.stringify(data)}`));
+                // Do nothing if connRef.open is true
+            }, 2000);
         };
 
         attemptConnection();
     };
+
+
 
     // Expose reconnect method to App.js if needed
     const reconnect = () => {
@@ -122,6 +132,8 @@ export const PeerProvider = ({ children }) => {
                 peer: peerRef.current,
                 peerId,
                 connection,
+                remoteId, // expose remoteId
+                isConnectionReady, // expose new state
                 connectToPeer,
                 reconnect,
                 isPeerReady,

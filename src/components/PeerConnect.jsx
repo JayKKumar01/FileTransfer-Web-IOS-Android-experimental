@@ -1,11 +1,20 @@
 import "./PeerConnect.css";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { usePeer } from "../contexts/PeerContext";
 
 const PeerConnect = () => {
-    const { peerId, connectToPeer, isPeerReady } = usePeer();
+    const { peerId, connectToPeer, isPeerReady, isConnectionReady, remoteId } = usePeer();
     const [targetId, setTargetId] = useState("");
-    const [buttonLabel, setButtonLabel] = useState("Connect"); // Button status
+    const [buttonLabel, setButtonLabel] = useState("Connect");
+    const [connecting, setConnecting] = useState(false);
+
+    // Reset targetId when connection is ready
+    useEffect(() => {
+        if (isConnectionReady) {
+            setTargetId("");
+            setConnecting(false);
+        }
+    }, [isConnectionReady]);
 
     if (!isPeerReady) {
         return (
@@ -17,21 +26,17 @@ const PeerConnect = () => {
 
     const handleConnect = () => {
         if (!targetId) return;
+
         setButtonLabel("Connecting...");
+        setConnecting(true);
 
         connectToPeer(targetId, (state) => {
-            switch (state) {
-                case "retrying":
-                    setButtonLabel("Retrying...");
-                    break;
-                case "connected":
-                    setButtonLabel("Connected ✅");
-                    break;
-                case "failed":
-                    setButtonLabel("Failed – Invalid ID");
-                    break;
-                default:
-                    setButtonLabel("Connect");
+            // Update button label dynamically for retries
+            if (state?.startsWith("Retrying")) {
+                setButtonLabel(state);
+            } else if (state === "failed") {
+                setButtonLabel("Connect");
+                setConnecting(false);
             }
         });
     };
@@ -39,15 +44,32 @@ const PeerConnect = () => {
     return (
         <div className="PeerConnect">
             <p>Your ID: <b>{peerId}</b></p>
-            <input
-                type="tel"
-                pattern="[0-9]*"
-                inputMode="numeric"
-                placeholder="Enter peer ID"
-                value={targetId}
-                onChange={(e) => setTargetId(e.target.value)}
-            />
-            <button onClick={handleConnect}>{buttonLabel}</button>
+
+            {!isConnectionReady && (
+                <>
+                    <input
+                        type="tel"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        placeholder="Enter peer ID"
+                        value={targetId}
+                        onChange={(e) => setTargetId(e.target.value)}
+                        disabled={connecting}
+                    />
+                    <button
+                        onClick={handleConnect}
+                        disabled={connecting || !targetId}
+                    >
+                        {buttonLabel}
+                    </button>
+                </>
+            )}
+
+            {isConnectionReady && remoteId && (
+                <p>
+                    Connected with peer: <b>{remoteId}</b> ✅
+                </p>
+            )}
         </div>
     );
 };

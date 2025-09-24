@@ -1,75 +1,95 @@
-let wakeLock = null;
-let retryInterval = null;
+import { useContext, useEffect, useRef, useState } from "react";
+import { LogContext } from "../contexts/LogContext";
 
-/**
- * Request a screen wake lock to prevent the device from sleeping.
- * Automatically tries to reacquire on visibility change (iOS & Chrome).
- * @param {Function} onStatusChange Optional callback: receives { status, error }
- */
-export async function requestWakeLock(onStatusChange) {
-    try {
-        if ('wakeLock' in navigator) {
-            // Function to request the lock
-            const acquireLock = async () => {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    if (onStatusChange) onStatusChange({ status: 'active' });
+export function useWakeLock() {
+    const { pushLog } = useContext(LogContext);
+    const wakeLockRef = useRef(null);
+    const retryIntervalRef = useRef(null);
+    const isAcquiringRef = useRef(false);
+    const [wakeLockActive, setWakeLockActive] = useState(false);
 
-                    // Handle release (reacquire automatically)
-                    wakeLock.addEventListener('release', () => {
-                        if (onStatusChange) onStatusChange({ status: 'released' });
-                    });
-                } catch (err) {
-                    if (onStatusChange) onStatusChange({ status: 'error', error: err });
-                }
-            };
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-            await acquireLock();
+    const acquireLock = async (fromUserInteraction = false) => {
+        if (!("wakeLock" in navigator)) {
+            pushLog && pushLog("WakeLock unsupported");
+            return false;
+        }
+        if (wakeLockRef.current || isAcquiringRef.current) return true;
 
-            // Re-acquire on visibility change
-            document.addEventListener('visibilitychange', async () => {
-                if (document.visibilityState === 'visible') {
-                    await acquireLock();
-                    if (onStatusChange) onStatusChange({ status: 'reacquired' });
-                }
+        // On iOS, must be user interaction
+        if (isIOS && !fromUserInteraction) return false;
+
+        isAcquiringRef.current = true;
+        try {
+            wakeLockRef.current = await navigator.wakeLock.request("screen");
+            pushLog && pushLog("WakeLock acquired");
+            setWakeLockActive(true);
+
+            wakeLockRef.current.addEventListener("release", () => {
+                wakeLockRef.current = null;
+                pushLog && pushLog("WakeLock released");
+                setWakeLockActive(false);
             });
 
-            // Safari/iOS may drop wake lock when tab is backgrounded
-            // Retry every few seconds as a fallback
-            if (!retryInterval) {
-                retryInterval = setInterval(async () => {
-                    if (wakeLock === null && document.visibilityState === 'visible') {
-                        await acquireLock();
-                        if (onStatusChange) onStatusChange({ status: 'reacquired' });
-                    }
-                }, 5000); // retry every 5 seconds
-            }
-
-        } else {
-            if (onStatusChange) onStatusChange({ status: 'unsupported' });
-        }
-    } catch (err) {
-        if (onStatusChange) onStatusChange({ status: 'error', error: err });
-    }
-}
-
-/**
- * Release the wake lock manually.
- */
-export async function releaseWakeLock(onStatusChange) {
-    if (wakeLock !== null) {
-        try {
-            await wakeLock.release();
-            wakeLock = null;
-            if (onStatusChange) onStatusChange({ status: 'released' });
+            return true;
         } catch (err) {
-            if (onStatusChange) onStatusChange({ status: 'error', error: err });
+            wakeLockRef.current = null;
+            pushLog && pushLog(`WakeLock error: ${err.message || err}`);
+            setWakeLockActive(false);
+            return false;
+        } finally {
+            isAcquiringRef.current = false;
         }
-    }
+    };
 
-    // Clear retry interval
-    if (retryInterval) {
-        clearInterval(retryInterval);
-        retryInterval = null;
-    }
+    const releaseLock = async () => {
+        if (wakeLockRef.current) {
+            try {
+                await wakeLockRef.current.release();
+            } catch (err) {
+                pushLog && pushLog(`Release error: ${err.message || err}`);
+            } finally {
+                wakeLockRef.current = null;
+                setWakeLockActive(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        let isUnmounted = false;
+
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === "visible" && !wakeLockRef.current) {
+                const success = await acquireLock(isIOS); // for iOS require user click
+                if (success && !isUnmounted) pushLog && pushLog("WakeLock reacquired (visibility change)");
+            }
+        };
+
+        // Try auto acquire for non-iOS
+        if (!isIOS) acquireLock();
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        if (!retryIntervalRef.current) {
+            retryIntervalRef.current = setInterval(async () => {
+                if (!wakeLockRef.current) {
+                    await acquireLock(isIOS); // iOS requires user interaction
+                }
+            }, 5000);
+        }
+
+        return () => {
+            isUnmounted = true;
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            releaseLock();
+            if (retryIntervalRef.current) {
+                clearInterval(retryIntervalRef.current);
+                retryIntervalRef.current = null;
+            }
+        };
+    }, [pushLog]);
+
+    return { wakeLockActive, requestUserWakeLock: () => acquireLock(true), isIOS };
 }

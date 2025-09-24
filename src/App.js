@@ -2,39 +2,32 @@ import React, { useContext, useEffect, useRef } from "react";
 import "./App.css";
 import PeerConnect from "./components/PeerConnect";
 import { LogContext } from "./contexts/LogContext";
-import { requestWakeLock, releaseWakeLock } from "./utils/wakeLock";
+import { useWakeLock } from "./utils/wakeLock";
 
 function App() {
-    const { logMessages, pushLog } = useContext(LogContext);
+    const { logMessages } = useContext(LogContext);
     const logRef = useRef(null);
 
-    // Scroll to the bottom whenever logMessages change
+    const { wakeLockActive, requestUserWakeLock, isIOS } = useWakeLock();
+
+    // Scroll to bottom whenever logMessages change
     useEffect(() => {
         if (logRef.current) {
             logRef.current.scrollTop = logRef.current.scrollHeight;
         }
     }, [logMessages]);
 
-    useEffect(() => {
-        // Request wake lock when the component mounts
-        requestWakeLock(({ status, error }) => {
-            if (error) pushLog(`WakeLock error: ${error.message || error}`);
-            else pushLog(`WakeLock status: ${status}`);
-        });
-
-        // Release wake lock on unmount
-        return () => {
-            releaseWakeLock(({ status, error }) => {
-                if (error) pushLog(`WakeLock release error: ${error.message || error}`);
-                else pushLog(`WakeLock released: ${status}`);
-            });
-        };
-    }, []);
-
     return (
         <div className="App">
             <header className="App-header">
                 <h1>FileTransfer-Web-IOS-Android</h1>
+
+                {/* Show button for iOS only if wake lock is not active */}
+                {isIOS && !wakeLockActive && (
+                    <button onClick={requestUserWakeLock}>
+                        Keep Screen Awake (iOS)
+                    </button>
+                )}
             </header>
 
             <main className="App-content">

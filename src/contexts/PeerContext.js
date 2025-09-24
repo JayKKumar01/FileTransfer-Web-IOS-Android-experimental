@@ -15,6 +15,12 @@ export const PeerProvider = ({ children }) => {
     const [remoteId, setRemoteId] = useState(null); // new state
     const [isPeerReady, setIsPeerReady] = useState(false);
     const [isConnectionReady, setIsConnectionReady] = useState(false); // new state
+    const isConnectionReadyRef = useRef(false); // <-- ref to track latest value
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        isConnectionReadyRef.current = isConnectionReady;
+    }, [isConnectionReady]);
 
     const log = (msg) => {
         console.log(msg);
@@ -38,9 +44,15 @@ export const PeerProvider = ({ children }) => {
 
         // ✅ Only reconnect on actual disconnect
         peer.on("disconnected", () => {
-            log("Peer disconnected...");
+            log("Peer disconnected..."+isConnectionReadyRef.current);
             setIsPeerReady(false);
-            peerRef.current.reconnect();
+            if (isConnectionReadyRef.current) { // here we are not getting the updated value
+                setConnection(null);
+                setRemoteId(null);
+                setIsConnectionReady(false);
+            }else {
+                peerRef.current.reconnect();
+            }
         });
 
         peer.on("close", () => log("Peer closed – please refresh the homepage to reconnect."));
@@ -55,7 +67,6 @@ export const PeerProvider = ({ children }) => {
     const setupConnection = (conn) => {
         setConnection(conn);
         setIsConnectionReady(false); // reset until open
-
         conn.on("open", () => {
             const remoteId = conn.peer.replace(PREFIX, "");
             log(`Connected to ${remoteId}`);
@@ -73,7 +84,7 @@ export const PeerProvider = ({ children }) => {
 
         log(`Trying to connect with ID: ${targetId}`);
 
-        const maxRetries = 3;
+        const maxRetries = 10;
         const retryInterval = 2000;
         let attempts = 0;
         let connRef = null;

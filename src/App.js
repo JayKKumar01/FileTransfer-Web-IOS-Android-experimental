@@ -29,17 +29,17 @@ function App() {
         return () => cleanup?.();
     }, []);
 
-    // ✅ Reconnect peer when app comes back to foreground
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") {
-                reconnect(); // <-- call reconnect on foreground
-            }
-        };
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, [reconnect]);
+    // // ✅ Reconnect peer when app comes back to foreground
+    // useEffect(() => {
+    //     const handleVisibilityChange = () => {
+    //         if (document.visibilityState === "visible") {
+    //             reconnect(); // <-- call reconnect on foreground
+    //         }
+    //     };
+    //
+    //     document.addEventListener("visibilitychange", handleVisibilityChange);
+    //     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    // }, [reconnect]);
 
     // Scroll to bottom whenever logMessages change
     useEffect(() => {

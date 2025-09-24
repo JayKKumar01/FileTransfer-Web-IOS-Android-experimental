@@ -1,16 +1,19 @@
+:root {
+  --app-height: 100vh; /* fallback if JS has not set the real value */
+}
 /* Root container */
 .App {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: var(--app-height, 100vh); /* ✅ has fallback */
   width: 100%;
   text-align: center;
   font-family: 'Segoe UI', Roboto, sans-serif;
   background-color: #121212;
   color: #ffffff;
   box-sizing: border-box;
-  padding: 0.5rem; /* unified margin for all sections */
-  gap: 0.5rem; /* consistent spacing between header, content, footer */
+  padding: 0.5rem;
+  gap: 0.5rem;
 }
 
 /* Header */

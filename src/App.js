@@ -5,10 +5,24 @@ import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
 
 function App() {
-    const { logMessages } = useContext(LogContext);
+    const { logMessages, pushLog } = useContext(LogContext);
     const logRef = useRef(null);
-
     const { wakeLockActive, requestUserWakeLock, isIOS } = useWakeLock();
+
+    // ✅ Set CSS variable for visible height
+    useEffect(() => {
+        const setAppHeight = () => {
+            const visibleHeight = window.innerHeight;
+            document.documentElement.style.setProperty('--app-height', `${visibleHeight}px`);
+            pushLog && pushLog(`📏 App height updated: ${visibleHeight}px`); // log height change
+            console.log(`[App] Visible height set: ${visibleHeight}px`);
+        };
+
+        setAppHeight();
+        window.addEventListener('resize', setAppHeight);
+
+        return () => window.removeEventListener('resize', setAppHeight);
+    }, [pushLog]);
 
     // Scroll to bottom whenever logMessages change
     useEffect(() => {
@@ -22,7 +36,6 @@ function App() {
             <header className="App-header">
                 <h1>FileTransfer-Web-IOS-Android</h1>
 
-                {/* Show button for iOS only if wake lock is not active */}
                 {isIOS && !wakeLockActive && (
                     <button onClick={requestUserWakeLock}>
                         Keep Screen Awake (iOS)

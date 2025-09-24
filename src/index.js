@@ -4,11 +4,14 @@ import './index.css';
 import App from './App';
 import { LogProvider } from './contexts/LogContext';
 import reportWebVitals from './reportWebVitals';
+import {PeerProvider} from "./contexts/PeerContext";
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
     <LogProvider>
-        <App />
+        <PeerProvider>
+            <App />
+        </PeerProvider>
     </LogProvider>
 );
 

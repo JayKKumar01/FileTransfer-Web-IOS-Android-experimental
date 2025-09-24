@@ -1,70 +1,22 @@
 import "./PeerConnect.css";
-import React, { useEffect, useRef, useState, useContext } from "react";
-import Peer from "peerjs";
-import { LogContext } from "../contexts/LogContext";
-
-const PREFIX = "jaykkumar01-ft-web-ios-android-";
-const RANDOM_ID = Math.floor(100000 + Math.random() * 900000); // 6-digit numeric
-
-let conn = null;
+import React, { useState } from "react";
+import { usePeer } from "../contexts/PeerContext";
 
 const PeerConnect = () => {
-    const { pushLog } = useContext(LogContext); // Use context directly
-    const peerRef = useRef(null);
+    const { peerId, connectToPeer, isPeerReady } = usePeer();
     const [targetId, setTargetId] = useState("");
-    const [myId] = useState(RANDOM_ID);
 
-    const log = (msg) => {
-        console.log(msg);
-        pushLog && pushLog(msg);
-    };
-
-    useEffect(() => {
-        const peerId = PREFIX + RANDOM_ID;
-        const peer = new Peer(peerId); // free PeerJS server
-        peerRef.current = peer;
-
-        log(`My ID is: ${RANDOM_ID}`);
-
-        peer.on("connection", (incomingConn) => {
-            const incomingPeerId = incomingConn.peer.replace(PREFIX, "");
-            log(`Incoming connection from: ${incomingPeerId}`);
-            setupConnection(incomingConn);
-        });
-
-        peer.on("disconnected", () => log("Disconnected from peer."));
-        peer.on("close", () => log("Peer closed."));
-
-        return () => peer.destroy();
-    }, []);
-
-    const setupConnection = (connection) => {
-        conn = connection;
-
-        conn.on("open", () => {
-            const remoteId = conn.peer.replace(PREFIX, "");
-            log(`Connected to ${remoteId}`);
-        });
-
-        conn.on("data", (data) => log(`Received data: ${JSON.stringify(data)}`));
-        conn.on("close", () => log("Data connection closed."));
-        conn.on("error", (err) => log(`Data connection error: ${err}`));
-    };
-
-    const handleConnect = () => {
-        if (!targetId) return;
-        const peer = peerRef.current;
-        if (!peer) return;
-
-        const connection = peer.connect(PREFIX + targetId, { reliable: true });
-        log(`Trying to connect with ID: ${targetId}`);
-
-        setupConnection(connection);
-    };
+    if (!isPeerReady) {
+        return (
+            <div className="PeerConnect">
+                <p>Connecting to server...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="PeerConnect">
-            <p>Your ID: <b>{myId}</b></p>
+            <p>Your ID: <b>{peerId}</b></p>
             <input
                 type="tel"
                 pattern="[0-9]*"
@@ -73,13 +25,9 @@ const PeerConnect = () => {
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
             />
-            <button onClick={handleConnect}>Connect</button>
+            <button onClick={() => connectToPeer(targetId)}>Connect</button>
         </div>
     );
 };
-
-export function getConnection() {
-    return conn;
-}
 
 export default PeerConnect;

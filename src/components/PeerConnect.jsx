@@ -1,21 +1,22 @@
 import "./PeerConnect.css";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useContext } from "react";
 import Peer from "peerjs";
+import { LogContext } from "../contexts/LogContext";
 
 const PREFIX = "jaykkumar01-ft-web-ios-android-";
 const RANDOM_ID = Math.floor(100000 + Math.random() * 900000); // 6-digit numeric
 
 let conn = null;
 
-const PeerConnect = ({ pushLog }) => {
+const PeerConnect = () => {
+    const { pushLog } = useContext(LogContext); // Use context directly
     const peerRef = useRef(null);
     const [targetId, setTargetId] = useState("");
-    const [myId, setMyId] = useState(RANDOM_ID);
+    const [myId] = useState(RANDOM_ID);
 
-    // Utility to log both to console and bottom log
     const log = (msg) => {
         console.log(msg);
-        if (pushLog) pushLog(msg);
+        pushLog && pushLog(msg);
     };
 
     useEffect(() => {
@@ -25,7 +26,6 @@ const PeerConnect = ({ pushLog }) => {
 
         log(`My ID is: ${RANDOM_ID}`);
 
-        // Incoming connection handler
         peer.on("connection", (incomingConn) => {
             const incomingPeerId = incomingConn.peer.replace(PREFIX, "");
             log(`Incoming connection from: ${incomingPeerId}`);
@@ -35,7 +35,6 @@ const PeerConnect = ({ pushLog }) => {
         peer.on("disconnected", () => log("Disconnected from peer."));
         peer.on("close", () => log("Peer closed."));
 
-        // Clean up
         return () => peer.destroy();
     }, []);
 
@@ -60,7 +59,6 @@ const PeerConnect = ({ pushLog }) => {
         const connection = peer.connect(PREFIX + targetId, { reliable: true });
         log(`Trying to connect with ID: ${targetId}`);
 
-        // Use same setup function
         setupConnection(connection);
     };
 
@@ -68,18 +66,16 @@ const PeerConnect = ({ pushLog }) => {
         <div className="PeerConnect">
             <p>Your ID: <b>{myId}</b></p>
             <input
-                type="tel"            // important: ensures numeric keyboard on iOS & Android
-                pattern="[0-9]*"      // hints only digits are allowed (iOS Safari)
-                inputMode="numeric"    // hints browser for numeric keypad
+                type="tel"
+                pattern="[0-9]*"
+                inputMode="numeric"
                 placeholder="Enter peer ID"
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
             />
-
             <button onClick={handleConnect}>Connect</button>
         </div>
     );
-
 };
 
 export function getConnection() {

@@ -1,32 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import "./App.css";
 import PeerConnect from "./components/PeerConnect";
-import { requestWakeLock, releaseWakeLock } from "./utils/wakeLock";
+import { LogContext } from "./contexts/LogContext";
+import { useWakeLock } from "./utils/wakeLock";
 
 function App() {
-    const [logMessages, setLogMessages] = useState([]);
-    const [wakeStatus, setWakeStatus] = useState(null);
+    const { logMessages } = useContext(LogContext);
+    const logRef = useRef(null);
 
-    const pushLog = (msg) => {
-        setLogMessages((prev) => [...prev, msg].slice(-10));
-    };
+    // Automatically handles wake lock and logs
+    useWakeLock();
 
+    // Scroll to the bottom whenever logMessages change
     useEffect(() => {
-        // Request wake lock when the component mounts
-        requestWakeLock(({ status, error }) => {
-            setWakeStatus(status);
-            if (error) pushLog(`WakeLock error: ${error.message || error}`);
-            else pushLog(`WakeLock status: ${status}`);
-        });
-
-        // Release wake lock on unmount
-        return () => {
-            releaseWakeLock(({ status, error }) => {
-                if (error) pushLog(`WakeLock release error: ${error.message || error}`);
-                else pushLog(`WakeLock released: ${status}`);
-            });
-        };
-    }, []);
+        if (logRef.current) {
+            logRef.current.scrollTop = logRef.current.scrollHeight;
+        }
+    }, [logMessages]);
 
     return (
         <div className="App">
@@ -35,14 +25,16 @@ function App() {
             </header>
 
             <main className="App-content">
-                <PeerConnect pushLog={pushLog} />
+                <PeerConnect />
+                {/* Other components can also log messages via context */}
             </main>
 
             <footer className="App-footer">
                 <textarea
+                    ref={logRef}
                     readOnly
                     className="App-log"
-                    value={[...logMessages, `Screen Wake Status: ${wakeStatus}`].join("\n")}
+                    value={logMessages.join("\n")}
                     placeholder="Logs will appear here..."
                 />
             </footer>

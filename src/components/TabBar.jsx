@@ -13,11 +13,11 @@ const TabBar = () => {
 
         if (tab === "SEND") {
             // navigate to /files if context is empty
-            navigate(files.length === 0 ? "/files" : "/share");
+            navigate(files.length === 0 ? "/files" : "/send");
         }
 
         if (tab === "RECEIVE") {
-            navigate("/share");
+            navigate("/receive");
         }
     };
 

@@ -4,66 +4,66 @@ import "../styles/ShareFiles.css";
 import { FileContext } from "../contexts/FileContext";
 
 const formatFileSize = (bytes) => {
-    if (bytes === 0) return "0 Bytes";
+    if (!bytes) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    return (bytes / Math.pow(k, i)).toFixed(2) + " " + sizes[i];
 };
 
-const ShareFiles = () => {
-    const { files } = useContext(FileContext);
+const ShareFiles = ({ isSender }) => {
+    const { files, downloads } = useContext(FileContext);
     const navigate = useNavigate();
+
+    const fileList = isSender ? files : downloads;
+
+    if (!isSender && fileList.length === 0) {
+        return (
+            <div className="FileShareContainer">
+                <p className="NoFilesText">No files received yet.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="FileShareContainer">
+            <div className="FileShareList">
+                <ul>
+                    {fileList.map((file, index) => (
+                        <li className="FileShareItem" key={index}>
+                            <div className="FileRow FileNameRow">
+                                <span className="FileName">{file.name}</span>
+                            </div>
 
-            {files.length === 0 ? (
-                <p className="NoFilesText">No files selected.</p>
-            ) : (
-                <div className="FileShareList">
-                    <ul>
-                        {files.map((file) => (
-                            <li
-                                key={`${file.name}-${file.size}-${file.lastModified}`}
-                                className="FileShareItem"
-                            >
-                                {/* Row 1: File name */}
-                                <div className="FileRow FileNameRow">
-                                    <span className="FileName">{file.name}</span>
-                                </div>
-
-                                {/* Row 2: Progressed / total size and Download button */}
-                                <div className="FileRow FileProgressRow">
-                                    <span className="FileProgressText">
-                                        0 KB / {formatFileSize(file.size)}
-                                    </span>
+                            <div className="FileRow FileProgressRow">
+                                <span className="FileProgressText">
+                                    0 KB / {formatFileSize(file.size)}
+                                </span>
+                                {!isSender && (
                                     <button className="DownloadFileButton" disabled>
                                         ⬇
                                     </button>
-                                </div>
+                                )}
+                            </div>
 
-                                {/* Row 3: Progress bar */}
-                                <div className="FileRow ProgressBarRow">
-                                    <div className="ProgressBar">
-                                        <div
-                                            className="ProgressFill"
-                                            style={{ width: "0%" }}
-                                        ></div>
-                                    </div>
+                            <div className="FileRow ProgressBarRow">
+                                <div className="ProgressBar">
+                                    <div className="ProgressFill" style={{ width: "0%" }} />
                                 </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+
+            {isSender && (
+                <button
+                    className="FileShareBackButton"
+                    onClick={() => navigate("/files")}
+                >
+                    Return to File Selection
+                </button>
             )}
-
-            <button
-                className="FileShareBackButton"
-                onClick={() => navigate("/files")}
-            >
-                Back to File Selection
-            </button>
         </div>
     );
 };

@@ -40,7 +40,7 @@ function App() {
     };
 
     // Routes where TabBar should be shown
-    const tabBarRoutes = ["/files", "/share"];
+    const tabBarRoutes = ["/files", "/send", "/receive"];
     const showTabBar = initialized && tabBarRoutes.includes(location.pathname);
 
     return (
@@ -58,7 +58,8 @@ function App() {
                     <Routes>
                         <Route path="/connect" element={<PeerConnect />} />
                         <Route path="/files" element={<FileInput />} />
-                        <Route path="/share" element={<ShareFiles />} />
+                        <Route path="/send" element={<ShareFiles isSender={true} />} />
+                        <Route path="/receive" element={<ShareFiles isSender={false} />} />
                         <Route path="*" element={<PeerConnect />} />
                     </Routes>
                 )}

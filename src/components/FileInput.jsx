@@ -35,14 +35,14 @@ const FileInput = () => {
     const handleShare = () => {
         if (tempFiles.length === 0) return;
 
-        // update the FileContext with the final temp list
-        setFiles(tempFiles);
+        // append tempFiles to the existing FileContext list
+        setFiles((prevFiles) => [...prevFiles, ...tempFiles]);
 
         // clear temp list
         setTempFiles([]);
 
         // navigate to share page
-        navigate("/share");
+        navigate("/send");
     };
 
     return (

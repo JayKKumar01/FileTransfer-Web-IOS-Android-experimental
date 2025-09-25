@@ -4,8 +4,8 @@ import "../styles/FileInput.css";
 import { FileContext } from "../contexts/FileContext";
 
 const FileItem = memo(({ file, onRemove }) => (
-    <li>
-        {file.name}
+    <li className="FileItem">
+        <span className="FileNameText">{file.name}</span>
         <button className="RemoveFileButton" onClick={onRemove}>×</button>
     </li>
 ));
@@ -21,7 +21,14 @@ const FileInput = () => {
     };
 
     const removeFile = (index) => {
-        setFiles((prev) => prev.filter((_, i) => i !== index));
+        const listItems = document.querySelectorAll(".FileList li");
+        const item = listItems[index];
+        if (item) {
+            item.classList.add("removing");
+            setTimeout(() => {
+                setFiles((prev) => prev.filter((_, i) => i !== index));
+            }, 300); // match transition duration
+        }
     };
 
     const handleShare = () => {

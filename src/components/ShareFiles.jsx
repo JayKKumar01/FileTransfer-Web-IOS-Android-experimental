@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import "../styles/ShareFiles.css";
 import { FileContext } from "../contexts/FileContext";
 
+const formatFileSize = (bytes) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
 const ShareFiles = () => {
     const { files } = useContext(FileContext);
     const navigate = useNavigate();
@@ -16,9 +24,11 @@ const ShareFiles = () => {
             ) : (
                 <div className="FileShareList">
                     <ul>
-                        {files.map((file, idx) => (
-                            <li key={`${file.name}-${file.size}-${file.lastModified}`} className="FileShareItem">
-
+                        {files.map((file) => (
+                            <li
+                                key={`${file.name}-${file.size}-${file.lastModified}`}
+                                className="FileShareItem"
+                            >
                                 {/* Row 1: File name */}
                                 <div className="FileRow FileNameRow">
                                     <span className="FileName">{file.name}</span>
@@ -27,7 +37,7 @@ const ShareFiles = () => {
                                 {/* Row 2: Progressed / total size and Download button */}
                                 <div className="FileRow FileProgressRow">
                                     <span className="FileProgressText">
-                                        0 KB / {Math.round(file.size / 1024)} KB
+                                        0 KB / {formatFileSize(file.size)}
                                     </span>
                                     <button className="DownloadFileButton" disabled>
                                         ⬇
@@ -37,17 +47,22 @@ const ShareFiles = () => {
                                 {/* Row 3: Progress bar */}
                                 <div className="FileRow ProgressBarRow">
                                     <div className="ProgressBar">
-                                        <div className="ProgressFill" style={{ width: "0%" }}></div>
+                                        <div
+                                            className="ProgressFill"
+                                            style={{ width: "0%" }}
+                                        ></div>
                                     </div>
                                 </div>
-
                             </li>
                         ))}
                     </ul>
                 </div>
             )}
 
-            <button className="FileShareBackButton" onClick={() => navigate("/files")}>
+            <button
+                className="FileShareBackButton"
+                onClick={() => navigate("/files")}
+            >
                 Back to File Selection
             </button>
         </div>

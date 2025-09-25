@@ -3,6 +3,7 @@ import "./App.css";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import PeerConnect from "./components/PeerConnect";
 import FileInput from "./components/FileInput";
+import ShareFiles from "./components/ShareFiles";
 import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
 import { preventPinchZoom, setVisibleHeight } from "./utils/osUtil";
@@ -51,6 +52,7 @@ function App() {
                     <Routes>
                         <Route path="/connect" element={<PeerConnect />} />
                         <Route path="/files" element={<FileInput />} />
+                        <Route path="/share" element={<ShareFiles />} />
                         <Route path="*" element={<PeerConnect />} />
                     </Routes>
                 )}

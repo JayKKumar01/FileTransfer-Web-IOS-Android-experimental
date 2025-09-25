@@ -1,4 +1,4 @@
-/* Root container fills parent like PeerConnect */
+/* Root container */
 .FileInput {
     display: flex;
     flex-direction: column;
@@ -8,56 +8,56 @@
     width: 100%;
     padding: 1rem;
     box-sizing: border-box;
-    background-color: #1a1a1a; /* dark background */
+    background-color: #1a1a1a;
     border-radius: 12px;
     color: #ffffff;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 /* Heading */
 .FileInput h2 {
     margin-bottom: 1rem;
     font-size: 1.2rem;
-    color: #57a0fc; /* soft blue accent */
 }
 
 /* File input field */
 .FileInput input[type="file"] {
     width: 80%;
     max-width: 300px;
-    padding: 0.6rem 0.75rem;
-    border-radius: 10px;
-    border: 1px solid #2575fc; /* blue border */
-    background-color: #121212; /* dark mode input */
-    color: #ffffff;
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background-color: #121212;
+    color: #fff;
     font-size: 1rem;
     cursor: pointer;
     box-sizing: border-box;
-    margin-bottom: 1rem;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    margin-bottom: 0.5rem;
 }
 
-.FileInput input[type="file"]:hover {
-    border-color: #1a5edb;
-    background-color: #1f1f1f;
+/* File count text */
+.FileCount {
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    color: #88b0ff; /* soft blue */
 }
 
 /* File list container */
 .FileList {
     width: 100%;
-    max-width: 340px;
-    background-color: #121212; /* slightly lighter dark */
-    border-radius: 10px;
-    padding: 0.8rem;
+    max-width: 320px;
+    background-color: #121212;
+    border-radius: 8px;
+    padding: 0.75rem;
     box-sizing: border-box;
-    border: 1px solid #2575fc;
+    max-height: 10rem; /* show ~3 items */
+    overflow-y: auto;
 }
 
 /* File list heading */
 .FileList h3 {
     margin: 0 0 0.5rem 0;
     font-size: 1rem;
-    color: #57a0fc;
 }
 
 /* File items */
@@ -68,23 +68,54 @@
 }
 
 .FileList li {
-    padding: 0.5rem 0.6rem;
-    border-bottom: 1px solid #2575fc33; /* semi-transparent blue */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid #333;
     font-size: 0.95rem;
     word-break: break-word;
-    transition: background-color 0.2s ease;
 }
 
-.FileList li:hover {
-    background-color: #2575fc11; /* subtle blue hover */
-}
-
-/* Last item no border */
 .FileList li:last-child {
     border-bottom: none;
 }
 
-/* Responsive adjustments */
+/* Remove file button */
+.RemoveFileButton {
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: background 0.2s ease;
+}
+
+.RemoveFileButton:hover {
+    background: #db1a1a;
+}
+
+/* Share Files button */
+.ShareFilesButton {
+    margin-top: 1rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    border: none;
+    background-color: #2575fc;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.ShareFilesButton:hover {
+    background-color: #1a5edb;
+}
+
+/* Responsive adjustments for mobile */
 @media (max-width: 480px) {
     .FileInput {
         padding: 0.8rem;
@@ -102,5 +133,15 @@
 
     .FileList li {
         font-size: 0.9rem;
+    }
+
+    .RemoveFileButton {
+        padding: 0 0.4rem;
+        font-size: 0.85rem;
+    }
+
+    .ShareFilesButton {
+        font-size: 0.95rem;
+        padding: 0.55rem 1rem;
     }
 }

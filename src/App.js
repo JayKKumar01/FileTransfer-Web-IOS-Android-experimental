@@ -3,12 +3,13 @@ import "./App.css";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import PeerConnect from "./components/PeerConnect";
 import FileInput from "./components/FileInput";
-import ShareFiles from "./components/ShareFiles";
 import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
 import { preventPinchZoom, setVisibleHeight } from "./utils/osUtil";
 import { usePeer } from "./contexts/PeerContext";
 import TabBar from "./components/TabBar";
+import SendFiles from "./components/SendFiles";
+import ReceiveFiles from "./components/ReceiveFiles";
 
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
@@ -58,8 +59,8 @@ function App() {
                     <Routes>
                         <Route path="/connect" element={<PeerConnect />} />
                         <Route path="/files" element={<FileInput />} />
-                        <Route path="/send" element={<ShareFiles isSender={true} />} />
-                        <Route path="/receive" element={<ShareFiles isSender={false} />} />
+                        <Route path="/send" element={<SendFiles/>} />
+                        <Route path="/receive" element={<ReceiveFiles/>} />
                         <Route path="*" element={<PeerConnect />} />
                     </Routes>
                 )}

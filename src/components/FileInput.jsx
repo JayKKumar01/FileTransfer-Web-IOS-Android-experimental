@@ -1,4 +1,4 @@
-import React, { useContext, memo } from "react";
+import React, { useContext, useState, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/FileInput.css";
 import { FileContext } from "../contexts/FileContext";
@@ -11,13 +11,14 @@ const FileItem = memo(({ file, onRemove }) => (
 ));
 
 const FileInput = () => {
-    const { files, setFiles } = useContext(FileContext);
+    const { setFiles } = useContext(FileContext); // don't read directly
+    const [tempFiles, setTempFiles] = useState([]); // temporary list
     const navigate = useNavigate();
 
     const handleFilesChange = (event) => {
         const newFiles = Array.from(event.target.files);
-        setFiles(newFiles); // replace previous files
-        event.target.value = null;
+        setTempFiles((prev) => [...prev, ...newFiles]);
+        event.target.value = null; // allow same file re-selection
     };
 
     const removeFile = (index) => {
@@ -26,13 +27,21 @@ const FileInput = () => {
         if (item) {
             item.classList.add("removing");
             setTimeout(() => {
-                setFiles((prev) => prev.filter((_, i) => i !== index));
+                setTempFiles((prev) => prev.filter((_, i) => i !== index));
             }, 300); // match transition duration
         }
     };
 
     const handleShare = () => {
-        if (files.length === 0) return;
+        if (tempFiles.length === 0) return;
+
+        // update the FileContext with the final temp list
+        setFiles(tempFiles);
+
+        // clear temp list
+        setTempFiles([]);
+
+        // navigate to share page
         navigate("/share");
     };
 
@@ -40,13 +49,13 @@ const FileInput = () => {
         <div className="FileInput">
             <input type="file" multiple onChange={handleFilesChange} />
             <p className="FileCount">
-                {files.length > 0 ? `${files.length} file(s) selected` : "No files selected"}
+                {tempFiles.length > 0 ? `${tempFiles.length} file(s) selected` : "No files selected"}
             </p>
 
-            {files.length > 0 && (
+            {tempFiles.length > 0 && (
                 <div className="FileList">
                     <ul>
-                        {files.map((file, idx) => (
+                        {tempFiles.map((file, idx) => (
                             <FileItem
                                 key={`${file.name}-${file.size}-${file.lastModified}`}
                                 file={file}
@@ -57,7 +66,7 @@ const FileInput = () => {
                 </div>
             )}
 
-            {files.length > 0 && (
+            {tempFiles.length > 0 && (
                 <button className="ShareFilesButton" onClick={handleShare}>
                     Share Files
                 </button>

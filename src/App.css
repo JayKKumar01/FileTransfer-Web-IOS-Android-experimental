@@ -68,16 +68,17 @@
 .App-content {
   flex: 1;
   display: flex;
-  flex-direction: column;    /* stack children vertically */
-  align-items: center;
-  justify-content: flex-start; /* push content to top */
+  flex-direction: column;   /* stack children vertically */
+  align-items: center;      /* horizontal center */
+  justify-content: center;  /* vertical center */
   background-color: #1f1f1f;
   border-radius: 8px;
   border: 1px solid #333;
   width: 100%;
   box-sizing: border-box;
-  overflow: hidden;          /* prevent TabBar overlap scroll */
+  overflow: hidden;         /* prevent TabBar overlap scroll */
 }
+
 
 
 /* Footer */

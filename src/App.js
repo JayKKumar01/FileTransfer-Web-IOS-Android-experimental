@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import "./App.css";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import PeerConnect from "./components/PeerConnect";
 import FileInput from "./components/FileInput";
 import ShareFiles from "./components/ShareFiles";
@@ -16,6 +16,7 @@ function App() {
     const { requestUserWakeLock } = useWakeLock();
     const { initializePeer } = usePeer();
     const navigate = useNavigate();
+    const location = useLocation();
     const [initialized, setInitialized] = useState(false);
 
     useEffect(() => {
@@ -38,6 +39,10 @@ function App() {
         navigate("/connect");
     };
 
+    // Routes where TabBar should be shown
+    const tabBarRoutes = ["/files", "/share"];
+    const showTabBar = initialized && tabBarRoutes.includes(location.pathname);
+
     return (
         <div className="App">
             <header className="App-header">
@@ -52,35 +57,26 @@ function App() {
                 ) : (
                     <Routes>
                         <Route path="/connect" element={<PeerConnect />} />
-                        <Route path="/files" element={
-                            <>
-                                <FileInput />
-                                <TabBar />
-                            </>
-                        } />
-                        <Route path="/share" element={
-                            <>
-                                <ShareFiles />
-                                <TabBar />
-                            </>
-                        } />
+                        <Route path="/files" element={<FileInput />} />
+                        <Route path="/share" element={<ShareFiles />} />
                         <Route path="*" element={<PeerConnect />} />
                     </Routes>
                 )}
             </main>
 
-            {/*<footer className="App-footer">*/}
-            {/*    <textarea*/}
-            {/*        ref={logRef}*/}
-            {/*        readOnly*/}
-            {/*        className="App-log"*/}
-            {/*        value={logMessages.join("\n")}*/}
-            {/*        placeholder="Logs will appear here..."*/}
-            {/*    />*/}
-            {/*</footer>*/}
+            {showTabBar && <TabBar />}
+
+            <footer className="App-footer">
+                <textarea
+                    ref={logRef}
+                    readOnly
+                    className="App-log"
+                    value={logMessages.join("\n")}
+                    placeholder="Logs will appear here..."
+                />
+            </footer>
         </div>
     );
 }
-
 
 export default App;

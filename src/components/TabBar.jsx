@@ -1,12 +1,15 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "../styles/TabBar.css";
 
-const TabBar = ({ onTabChange }) => {
+const TabBar = () => {
     const [activeTab, setActiveTab] = useState("SEND");
+    const navigate = useNavigate();
 
     const handleTabClick = (tab) => {
         setActiveTab(tab);
-        if (onTabChange) onTabChange(tab);
+        if (tab === "SEND") navigate("/files");
+        if (tab === "RECEIVE") navigate("/share");
     };
 
     return (

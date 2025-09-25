@@ -17,7 +17,6 @@ const ShareFiles = () => {
 
     return (
         <div className="FileShareContainer">
-            <h2 className="FileShareTitle">Share Files</h2>
 
             {files.length === 0 ? (
                 <p className="NoFilesText">No files selected.</p>

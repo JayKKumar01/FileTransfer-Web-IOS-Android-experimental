@@ -38,7 +38,6 @@ const FileInput = () => {
 
     return (
         <div className="FileInput">
-            <h2>Select files to upload</h2>
             <input type="file" multiple onChange={handleFilesChange} />
             <p className="FileCount">
                 {files.length > 0 ? `${files.length} file(s) selected` : "No files selected"}

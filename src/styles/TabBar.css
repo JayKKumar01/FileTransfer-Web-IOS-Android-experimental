@@ -1,0 +1,43 @@
+.TabBar {
+    display: flex;
+    width: 100%;                     /* full parent width */
+    margin-top: auto;                /* push to bottom if flex parent */
+    height: 48px;
+    box-shadow: 0 -2px 6px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+/* Each tab button */
+.TabButton {
+    flex: 1; /* equal share */
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    background-color: #444;   /* default grey */
+    color: rgba(255, 255, 255, 0.6);              /* default white text */
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Active tab → white background + blue text */
+.TabButton.active {
+    background-color: #ffffff;
+    color: #2575fc;
+}
+
+/* Hover effect for inactive tabs */
+.TabButton:not(.active):hover {
+    background-color: #666; /* lighter grey on hover */
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .TabBar {
+        height: 44px;
+    }
+
+    .TabButton {
+        font-size: 0.95rem;
+    }
+}

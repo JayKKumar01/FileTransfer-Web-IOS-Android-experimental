@@ -8,6 +8,7 @@ import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
 import { preventPinchZoom, setVisibleHeight } from "./utils/osUtil";
 import { usePeer } from "./contexts/PeerContext";
+import TabBar from "./components/TabBar";
 
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
@@ -51,22 +52,32 @@ function App() {
                 ) : (
                     <Routes>
                         <Route path="/connect" element={<PeerConnect />} />
-                        <Route path="/files" element={<FileInput />} />
-                        <Route path="/share" element={<ShareFiles />} />
+                        <Route path="/files" element={
+                            <>
+                                <FileInput />
+                                <TabBar />
+                            </>
+                        } />
+                        <Route path="/share" element={
+                            <>
+                                <ShareFiles />
+                                <TabBar />
+                            </>
+                        } />
                         <Route path="*" element={<PeerConnect />} />
                     </Routes>
                 )}
             </main>
 
-            <footer className="App-footer">
-                <textarea
-                    ref={logRef}
-                    readOnly
-                    className="App-log"
-                    value={logMessages.join("\n")}
-                    placeholder="Logs will appear here..."
-                />
-            </footer>
+            {/*<footer className="App-footer">*/}
+            {/*    <textarea*/}
+            {/*        ref={logRef}*/}
+            {/*        readOnly*/}
+            {/*        className="App-log"*/}
+            {/*        value={logMessages.join("\n")}*/}
+            {/*        placeholder="Logs will appear here..."*/}
+            {/*    />*/}
+            {/*</footer>*/}
         </div>
     );
 }

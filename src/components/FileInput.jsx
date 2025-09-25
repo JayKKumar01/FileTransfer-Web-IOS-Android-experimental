@@ -39,7 +39,6 @@ const FileInput = () => {
 
             {files.length > 0 && (
                 <div className="FileList">
-                    <h3>Selected Files:</h3>
                     <ul>
                         {files.map((file, idx) => (
                             <FileItem

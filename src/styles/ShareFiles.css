@@ -1,0 +1,185 @@
+/* Root container */
+/* Root container */
+.FileShareContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* center its children */
+    width: 100%;
+    padding: 1rem;
+    border-radius: 12px;
+    color: #ffffff;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+
+
+/* Title */
+.FileShareTitle {
+    margin: 0 0 1rem 0;   /* reset default h2 top margin */
+    font-size: 1.3rem;
+    color: #88b0ff;
+    line-height: 1.4;     /* consistent spacing */
+    text-align: center;   /* optional: center align */
+}
+
+
+/* No files text */
+.NoFilesText {
+    font-size: 1rem;
+    color: #aaaaaa;
+}
+
+/* File list container */
+.FileShareList {
+    width: 100%;
+    max-width: 500px;
+    background-color: #14142a;
+    border-radius: 10px;
+    padding: 0.75rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+/* File items */
+.FileShareList ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.FileShareItem {
+    display: flex;
+    flex-direction: column;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid #333;
+    gap: 0.4rem;
+    word-break: break-word; /* allow long names to wrap */
+}
+
+/* Last item no border */
+.FileShareItem:last-child {
+    border-bottom: none;
+}
+
+/* Common row styling */
+.FileRow {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+/* Row 1: file name (multi-line) */
+.FileNameRow .FileName {
+    font-weight: 500;
+    color: #ffffff;
+    overflow-wrap: break-word;
+    white-space: normal; /* allow wrapping */
+    line-height: 1.2rem;
+}
+
+/* Row 2: progress text + download button */
+.FileProgressRow {
+    justify-content: space-between;
+    align-items: center;
+    display: flex;
+}
+
+.FileProgressText {
+    font-size: 0.85rem;
+    color: #88b0ff;
+}
+
+/* Download button (small) */
+.DownloadFileButton {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    border: none;
+    background-color: #3a8cff;
+    color: white;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.2s ease;
+}
+
+.DownloadFileButton:disabled {
+    background-color: #555a78;
+    cursor: not-allowed;
+}
+
+.DownloadFileButton:hover:enabled {
+    background-color: #1a5edb;
+}
+
+/* Row 3: progress bar */
+.ProgressBarRow {
+    margin-top: 2px;
+}
+
+.ProgressBar {
+    width: 100%;
+    height: 6px;
+    background-color: #222240;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ProgressFill {
+    height: 100%;
+    width: 0%;
+    background-color: #2575fc;
+    border-radius: 4px;
+    transition: width 0.2s ease;
+}
+
+/* Back button */
+.FileShareBackButton {
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    border: none;
+    background-color: #2575fc;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.FileShareBackButton:hover {
+    background-color: #1a5edb;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 480px) {
+    .FileShareContainer {
+        padding: 0.8rem;
+    }
+
+    .FileShareList {
+        max-width: 95%;
+        padding: 0.6rem;
+    }
+
+    .FileShareItem {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.5rem;
+        gap: 0.3rem;
+    }
+
+    .FileNameRow .FileName {
+        font-size: 0.95rem;
+        line-height: 1.15rem;
+    }
+
+    .FileProgressText {
+        font-size: 0.8rem;
+    }
+
+    .DownloadFileButton,
+    .FileShareBackButton {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.7rem;
+    }
+}

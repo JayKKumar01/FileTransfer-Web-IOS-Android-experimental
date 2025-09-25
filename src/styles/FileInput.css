@@ -1,0 +1,106 @@
+/* Root container fills parent like PeerConnect */
+.FileInput {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    height: 100%;
+    width: 100%;
+    padding: 1rem;
+    box-sizing: border-box;
+    background-color: #1a1a1a; /* dark background */
+    border-radius: 12px;
+    color: #ffffff;
+    overflow-y: auto;
+}
+
+/* Heading */
+.FileInput h2 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: #57a0fc; /* soft blue accent */
+}
+
+/* File input field */
+.FileInput input[type="file"] {
+    width: 80%;
+    max-width: 300px;
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid #2575fc; /* blue border */
+    background-color: #121212; /* dark mode input */
+    color: #ffffff;
+    font-size: 1rem;
+    cursor: pointer;
+    box-sizing: border-box;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.FileInput input[type="file"]:hover {
+    border-color: #1a5edb;
+    background-color: #1f1f1f;
+}
+
+/* File list container */
+.FileList {
+    width: 100%;
+    max-width: 340px;
+    background-color: #121212; /* slightly lighter dark */
+    border-radius: 10px;
+    padding: 0.8rem;
+    box-sizing: border-box;
+    border: 1px solid #2575fc;
+}
+
+/* File list heading */
+.FileList h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: #57a0fc;
+}
+
+/* File items */
+.FileList ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.FileList li {
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid #2575fc33; /* semi-transparent blue */
+    font-size: 0.95rem;
+    word-break: break-word;
+    transition: background-color 0.2s ease;
+}
+
+.FileList li:hover {
+    background-color: #2575fc11; /* subtle blue hover */
+}
+
+/* Last item no border */
+.FileList li:last-child {
+    border-bottom: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .FileInput {
+        padding: 0.8rem;
+    }
+
+    .FileInput input[type="file"] {
+        width: 90%;
+        font-size: 0.95rem;
+    }
+
+    .FileList {
+        max-width: 90%;
+        padding: 0.6rem;
+    }
+
+    .FileList li {
+        font-size: 0.9rem;
+    }
+}

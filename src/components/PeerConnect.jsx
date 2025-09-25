@@ -1,18 +1,22 @@
-import "./PeerConnect.css";
+import "../styles/PeerConnect.css";
 import React, { useState, useEffect } from "react";
 import { usePeer } from "../contexts/PeerContext";
+import { useNavigate } from "react-router-dom";
 
 const PeerConnect = () => {
     const { peerId, connectToPeer, isPeerReady, isConnectionReady, remoteId } = usePeer();
     const [targetId, setTargetId] = useState("");
     const [status, setStatus] = useState("Connect");
+    const navigate = useNavigate();
 
+    // Navigate to /files once connection is ready
     useEffect(() => {
         if (isConnectionReady) {
-            setTargetId(""); // Clear input after connection
+            setTargetId("");
             setStatus("Connected ✅");
+            navigate("/files"); // Go to file input step
         }
-    }, [isConnectionReady]);
+    }, [isConnectionReady, navigate]);
 
     if (!isPeerReady) return <p>Connecting to server...</p>;
 
@@ -21,11 +25,8 @@ const PeerConnect = () => {
         setStatus("Connecting...");
 
         connectToPeer(targetId, (state) => {
-            if (state?.startsWith("Retrying")) {
-                setStatus(state);
-            } else if (state === "failed") {
-                setStatus("Connect");
-            }
+            if (state?.startsWith("Retrying")) setStatus(state);
+            else if (state === "failed") setStatus("Connect");
         });
     };
 
@@ -33,7 +34,7 @@ const PeerConnect = () => {
         <div className="PeerConnect">
             <p>Your ID: <b>{peerId}</b></p>
 
-            {!isConnectionReady && (
+            {!isConnectionReady ? (
                 <>
                     <input
                         type="tel"
@@ -51,9 +52,7 @@ const PeerConnect = () => {
                         {status}
                     </button>
                 </>
-            )}
-
-            {isConnectionReady && remoteId && (
+            ) : (
                 <p>Connected with peer: <b>{remoteId}</b> ✅</p>
             )}
         </div>

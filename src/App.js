@@ -1,6 +1,8 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import "./App.css";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import PeerConnect from "./components/PeerConnect";
+import FileInput from "./components/FileInput";
 import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
 import { preventPinchZoom, setVisibleHeight } from "./utils/osUtil";
@@ -9,10 +11,11 @@ import { usePeer } from "./contexts/PeerContext";
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
     const logRef = useRef(null);
-    const { wakeLockActive, requestUserWakeLock } = useWakeLock();
+    const { requestUserWakeLock } = useWakeLock();
     const { initializePeer } = usePeer();
+    const navigate = useNavigate();
+    const [initialized, setInitialized] = useState(false);
 
-    // Handle visible height
     useEffect(() => {
         const updateHeight = () => setVisibleHeight(pushLog);
         updateHeight();
@@ -20,17 +23,17 @@ function App() {
         return () => window.removeEventListener("resize", updateHeight);
     }, [pushLog]);
 
-    // Prevent pinch zoom
     useEffect(() => preventPinchZoom(pushLog), []);
 
-    // Auto-scroll logs
     useEffect(() => {
         if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
     }, [logMessages]);
 
     const handleButtonClick = async () => {
         await requestUserWakeLock();
-        initializePeer(); // Only initialize after user interaction
+        initializePeer();
+        setInitialized(true);
+        navigate("/connect");
     };
 
     return (
@@ -40,12 +43,16 @@ function App() {
             </header>
 
             <main className="App-content">
-                {!wakeLockActive ? (
+                {!initialized ? (
                     <button className="App-init-button" onClick={handleButtonClick}>
                         Keep Screen Awake & Initialize
                     </button>
                 ) : (
-                    <PeerConnect />
+                    <Routes>
+                        <Route path="/connect" element={<PeerConnect />} />
+                        <Route path="/files" element={<FileInput />} />
+                        <Route path="*" element={<PeerConnect />} />
+                    </Routes>
                 )}
             </main>
 
@@ -61,5 +68,6 @@ function App() {
         </div>
     );
 }
+
 
 export default App;

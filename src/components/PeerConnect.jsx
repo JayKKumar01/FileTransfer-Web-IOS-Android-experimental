@@ -5,38 +5,26 @@ import { usePeer } from "../contexts/PeerContext";
 const PeerConnect = () => {
     const { peerId, connectToPeer, isPeerReady, isConnectionReady, remoteId } = usePeer();
     const [targetId, setTargetId] = useState("");
-    const [buttonLabel, setButtonLabel] = useState("Connect");
-    const [connecting, setConnecting] = useState(false);
+    const [status, setStatus] = useState("Connect");
 
-    // Reset targetId when connection is ready
     useEffect(() => {
         if (isConnectionReady) {
-            setTargetId("");
-            setConnecting(false);
+            setTargetId(""); // Clear input after connection
+            setStatus("Connected ✅");
         }
     }, [isConnectionReady]);
 
-    if (!isPeerReady) {
-        return (
-            <div className="PeerConnect">
-                <p>Connecting to server...</p>
-            </div>
-        );
-    }
+    if (!isPeerReady) return <p>Connecting to server...</p>;
 
     const handleConnect = () => {
         if (!targetId) return;
-
-        setButtonLabel("Connecting...");
-        setConnecting(true);
+        setStatus("Connecting...");
 
         connectToPeer(targetId, (state) => {
-            // Update button label dynamically for retries
             if (state?.startsWith("Retrying")) {
-                setButtonLabel(state);
+                setStatus(state);
             } else if (state === "failed") {
-                setButtonLabel("Connect");
-                setConnecting(false);
+                setStatus("Connect");
             }
         });
     };
@@ -54,21 +42,19 @@ const PeerConnect = () => {
                         placeholder="Enter peer ID"
                         value={targetId}
                         onChange={(e) => setTargetId(e.target.value)}
-                        disabled={connecting}
+                        disabled={status !== "Connect"}
                     />
                     <button
                         onClick={handleConnect}
-                        disabled={connecting || !targetId}
+                        disabled={!targetId || status !== "Connect"}
                     >
-                        {buttonLabel}
+                        {status}
                     </button>
                 </>
             )}
 
             {isConnectionReady && remoteId && (
-                <p>
-                    Connected with peer: <b>{remoteId}</b> ✅
-                </p>
+                <p>Connected with peer: <b>{remoteId}</b> ✅</p>
             )}
         </div>
     );

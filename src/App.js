@@ -10,11 +10,9 @@ function App() {
     const { logMessages, pushLog } = useContext(LogContext);
     const logRef = useRef(null);
     const { wakeLockActive, requestUserWakeLock } = useWakeLock();
-    const [buttonClicked, setButtonClicked] = useState(false);
-
     const { initializePeer } = usePeer();
 
-    // ✅ Handle visible height on portrait mode
+    // Handle visible height
     useEffect(() => {
         const updateHeight = () => setVisibleHeight(pushLog);
         updateHeight();
@@ -22,24 +20,17 @@ function App() {
         return () => window.removeEventListener("resize", updateHeight);
     }, [pushLog]);
 
-    // ✅ Enable pinch/zoom prevention on all devices
-    useEffect(() => {
-        const cleanup = preventPinchZoom(pushLog);
-        return () => cleanup?.();
-    }, []);
+    // Prevent pinch zoom
+    useEffect(() => preventPinchZoom(pushLog), []);
 
-    // Scroll to bottom whenever logMessages change
+    // Auto-scroll logs
     useEffect(() => {
-        if (logRef.current) {
-            logRef.current.scrollTop = logRef.current.scrollHeight;
-        }
+        if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
     }, [logMessages]);
 
-    // Handler for wake lock / initialization button
     const handleButtonClick = async () => {
-        await requestUserWakeLock(); // safe on all devices
-        setButtonClicked(true);
-        initializePeer(); // initialize peer after user action
+        await requestUserWakeLock();
+        initializePeer(); // Only initialize after user interaction
     };
 
     return (
@@ -49,9 +40,9 @@ function App() {
             </header>
 
             <main className="App-content">
-                {!buttonClicked ? (
+                {!wakeLockActive ? (
                     <button className="App-init-button" onClick={handleButtonClick}>
-                        {wakeLockActive ? "Initialize Connection" : "Keep Screen Awake & Initialize"}
+                        Keep Screen Awake & Initialize
                     </button>
                 ) : (
                     <PeerConnect />

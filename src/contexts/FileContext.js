@@ -1,9 +1,9 @@
 import React, { createContext, useState } from "react";
 
 export const FileContext = createContext({
-    files: [],
+    files: [],           // files to send
     setFiles: () => {},
-    downloads: [],
+    downloads: [],       // files being received
     setDownloads: () => {},
 });
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "../styles/FileInput.css";
 import { FileContext } from "../contexts/FileContext";
 
+// -------------------- File Item Component --------------------
 const FileItem = memo(({ file, onRemove }) => {
     const [removing, setRemoving] = useState(false);
 
@@ -19,25 +20,32 @@ const FileItem = memo(({ file, onRemove }) => {
     );
 });
 
+// -------------------- File Input Component --------------------
 const FileInput = () => {
     const { files, setFiles } = useContext(FileContext);
     const [tempFiles, setTempFiles] = useState([]);
     const navigate = useNavigate();
 
+    // Handle file selection
     const handleFilesChange = (event) => {
         const newFiles = Array.from(event.target.files).map((file) => ({
             id: `${file.name}-${file.size}-${Date.now()}`, // unique id
             file,
             name: file.name,
+            size: file.size,
+            progress: 0,          // ready for chunked sending
+            status: "pending",    // "pending" | "sending" | "completed"
         }));
         setTempFiles(newFiles);
-        event.target.value = null;
+        event.target.value = null; // reset input
     };
 
+    // Remove a file from tempFiles
     const removeFile = (id) => {
         setTempFiles((prev) => prev.filter((f) => f.id !== id));
     };
 
+    // Move files from temp to main context
     const handleShare = () => {
         if (tempFiles.length === 0) return;
         setFiles((prevFiles) => [...prevFiles, ...tempFiles]);
@@ -45,6 +53,7 @@ const FileInput = () => {
         navigate("/send");
     };
 
+    // View current files in progress
     const handleViewFiles = () => {
         navigate("/send");
     };
@@ -53,26 +62,24 @@ const FileInput = () => {
         <div className="FileInput">
             {files.length > 0 && (
                 <div className="TopRow">
-                    <span className="SecondaryLink" onClick={handleViewFiles}>
-                        View Current Progress
-                    </span>
+          <span className="SecondaryLink" onClick={handleViewFiles}>
+            View Current Progress
+          </span>
                 </div>
             )}
 
             <input type="file" multiple onChange={handleFilesChange} />
             <p className="FileCount">
-                {tempFiles.length > 0 ? `${tempFiles.length} file(s) selected` : "No files selected"}
+                {tempFiles.length > 0
+                    ? `${tempFiles.length} file(s) selected`
+                    : "No files selected"}
             </p>
 
             {tempFiles.length > 0 && (
                 <div className="FileList">
                     <ul>
                         {tempFiles.map((file) => (
-                            <FileItem
-                                key={file.id}
-                                file={file}
-                                onRemove={removeFile}
-                            />
+                            <FileItem key={file.id} file={file} onRemove={removeFile} />
                         ))}
                     </ul>
                 </div>

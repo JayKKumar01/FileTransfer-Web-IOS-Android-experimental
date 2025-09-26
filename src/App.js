@@ -10,6 +10,7 @@ import { usePeer } from "./contexts/PeerContext";
 import TabBar from "./components/TabBar";
 import SendFiles from "./components/SendFiles";
 import ReceiveFiles from "./components/ReceiveFiles";
+import FileChunkTest from "./components/FileChunkTest"; // ✅ test component
 
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
@@ -40,6 +41,10 @@ function App() {
         navigate("/connect");
     };
 
+    const handleTestClick = () => {
+        navigate("/test-chunk");
+    };
+
     // Routes where TabBar should be shown
     const tabBarRoutes = ["/files", "/send", "/receive"];
     const showTabBar = initialized && tabBarRoutes.includes(location.pathname);
@@ -56,13 +61,22 @@ function App() {
                         Keep Screen Awake & Initialize
                     </button>
                 ) : (
-                    <Routes>
-                        <Route path="/connect" element={<PeerConnect />} />
-                        <Route path="/files" element={<FileInput />} />
-                        <Route path="/send" element={<SendFiles/>} />
-                        <Route path="/receive" element={<ReceiveFiles/>} />
-                        <Route path="*" element={<PeerConnect />} />
-                    </Routes>
+                    <>
+                        <Routes>
+                            <Route path="/connect" element={<PeerConnect />} />
+                            <Route path="/files" element={<FileInput />} />
+                            <Route path="/send" element={<SendFiles />} />
+                            <Route path="/receive" element={<ReceiveFiles />} />
+                            <Route path="/test-chunk" element={<FileChunkTest />} /> {/* ✅ new test route */}
+                            <Route path="*" element={<PeerConnect />} />
+                        </Routes>
+
+                        <div style={{ marginTop: "15px", textAlign: "center" }}>
+                            <button onClick={handleTestClick}>
+                                Test File Chunking & IndexedDB
+                            </button>
+                        </div>
+                    </>
                 )}
             </main>
 

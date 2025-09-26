@@ -10,7 +10,8 @@ import { usePeer } from "./contexts/PeerContext";
 import TabBar from "./components/TabBar";
 import SendFiles from "./components/SendFiles";
 import ReceiveFiles from "./components/ReceiveFiles";
-import FileChunkTest from "./components/FileChunkTest"; // ✅ test component
+import FileChunkTest from "./components/FileChunkTest";
+import FileSenderTest from "./components/FileSenderTest"; // ✅ test component
 
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
@@ -67,7 +68,7 @@ function App() {
                             <Route path="/files" element={<FileInput />} />
                             <Route path="/send" element={<SendFiles />} />
                             <Route path="/receive" element={<ReceiveFiles />} />
-                            <Route path="/test-chunk" element={<FileChunkTest />} /> {/* ✅ new test route */}
+                            <Route path="/test-chunk" element={<FileSenderTest />} /> {/* ✅ new test route */}
                             <Route path="*" element={<PeerConnect />} />
                         </Routes>
 

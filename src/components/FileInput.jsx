@@ -3,50 +3,62 @@ import { useNavigate } from "react-router-dom";
 import "../styles/FileInput.css";
 import { FileContext } from "../contexts/FileContext";
 
-const FileItem = memo(({ file, onRemove }) => (
-    <li className="FileItem">
-        <span className="FileNameText">{file.name}</span>
-        <button className="RemoveFileButton" onClick={onRemove}>×</button>
-    </li>
-));
+const FileItem = memo(({ file, onRemove }) => {
+    const [removing, setRemoving] = useState(false);
+
+    const handleRemove = () => {
+        setRemoving(true);
+        setTimeout(() => onRemove(file.id), 300);
+    };
+
+    return (
+        <li className={`FileItem ${removing ? "removing" : ""}`}>
+            <span className="FileNameText">{file.name}</span>
+            <button className="RemoveFileButton" onClick={handleRemove}>×</button>
+        </li>
+    );
+});
 
 const FileInput = () => {
-    const { setFiles } = useContext(FileContext); // don't read directly
-    const [tempFiles, setTempFiles] = useState([]); // temporary list
+    const { files, setFiles } = useContext(FileContext);
+    const [tempFiles, setTempFiles] = useState([]);
     const navigate = useNavigate();
 
     const handleFilesChange = (event) => {
-        const newFiles = Array.from(event.target.files);
-        setTempFiles((prev) => [...prev, ...newFiles]);
-        event.target.value = null; // allow same file re-selection
+        const newFiles = Array.from(event.target.files).map((file) => ({
+            id: `${file.name}-${file.size}-${Date.now()}`, // unique id
+            file,
+            name: file.name,
+        }));
+        setTempFiles(newFiles);
+        event.target.value = null;
     };
 
-    const removeFile = (index) => {
-        const listItems = document.querySelectorAll(".FileList li");
-        const item = listItems[index];
-        if (item) {
-            item.classList.add("removing");
-            setTimeout(() => {
-                setTempFiles((prev) => prev.filter((_, i) => i !== index));
-            }, 300); // match transition duration
-        }
+    const removeFile = (id) => {
+        setTempFiles((prev) => prev.filter((f) => f.id !== id));
     };
 
     const handleShare = () => {
         if (tempFiles.length === 0) return;
-
-        // append tempFiles to the existing FileContext list
         setFiles((prevFiles) => [...prevFiles, ...tempFiles]);
-
-        // clear temp list
         setTempFiles([]);
+        navigate("/send");
+    };
 
-        // navigate to share page
+    const handleViewFiles = () => {
         navigate("/send");
     };
 
     return (
         <div className="FileInput">
+            {files.length > 0 && (
+                <div className="TopRow">
+                    <span className="SecondaryLink" onClick={handleViewFiles}>
+                        View Current Progress
+                    </span>
+                </div>
+            )}
+
             <input type="file" multiple onChange={handleFilesChange} />
             <p className="FileCount">
                 {tempFiles.length > 0 ? `${tempFiles.length} file(s) selected` : "No files selected"}
@@ -55,11 +67,11 @@ const FileInput = () => {
             {tempFiles.length > 0 && (
                 <div className="FileList">
                     <ul>
-                        {tempFiles.map((file, idx) => (
+                        {tempFiles.map((file) => (
                             <FileItem
-                                key={`${file.name}-${file.size}-${file.lastModified}`}
+                                key={file.id}
                                 file={file}
-                                onRemove={() => removeFile(idx)}
+                                onRemove={removeFile}
                             />
                         ))}
                     </ul>
@@ -68,7 +80,7 @@ const FileInput = () => {
 
             {tempFiles.length > 0 && (
                 <button className="ShareFilesButton" onClick={handleShare}>
-                    Share Files
+                    Proceed to Send
                 </button>
             )}
         </div>

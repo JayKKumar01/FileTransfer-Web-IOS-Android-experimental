@@ -91,18 +91,15 @@
 
 /* Back button */
 .back-button {
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    border: none;
-    background-color: #2575fc;
-    color: white;
-    font-size: 1rem;
+    color: #88b0ff;
+    font-size: 0.95rem;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    text-decoration: underline;
+    transition: color 0.2s ease;
 }
 
 .back-button:hover {
-    background-color: #1a5edb;
+    color: #a0c4ff;
 }
 
 /* Mobile responsiveness */

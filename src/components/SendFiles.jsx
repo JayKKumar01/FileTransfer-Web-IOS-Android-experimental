@@ -32,12 +32,12 @@ const SendFiles = () => {
                 </ul>
             </div>
 
-            <button
+            <span
                 className="back-button"
                 onClick={() => navigate("/files")}
             >
                 Return to File Selection
-            </button>
+            </span>
         </div>
     );
 };

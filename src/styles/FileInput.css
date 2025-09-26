@@ -1,26 +1,39 @@
-/* Root container */
 .FileInput {
-    flex: 1;                        /* ✅ expand to fill available space */
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     width: 100%;
     padding: 1rem;
-    border-radius: 12px 12px 0 0;   /* ✅ rounded only on top, bottom will meet TabBar */
-    color: #ffffff;
+    border-radius: 12px 12px 0 0;
+    color: #fff;
     box-sizing: border-box;
-    overflow-y: auto;               /* ✅ scroll if content overflows */
-    overflow-x: hidden;
+    overflow-y: auto;
 }
 
-/* Heading */
-.FileInput h2 {
-    margin-bottom: 1rem;
-    font-size: 1.25rem;
+/* Top row */
+.TopRow {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+}
+
+/* Secondary link */
+.SecondaryLink {
     color: #88b0ff;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.2s ease;
 }
 
-/* File input field */
+.SecondaryLink:hover {
+    color: #a0c4ff;
+}
+
+/* File input */
 .FileInput input[type="file"] {
     width: 80%;
     max-width: 320px;
@@ -34,14 +47,14 @@
     margin-bottom: 0.5rem;
 }
 
-/* File count text */
+/* File count */
 .FileCount {
     margin-bottom: 1rem;
     font-size: 0.95rem;
     color: #88b0ff;
 }
 
-/* File list container */
+/* File list */
 .FileList {
     width: 100%;
     max-width: 400px;
@@ -53,13 +66,13 @@
     margin-bottom: 1rem;
 }
 
-/* File items */
 .FileList ul {
     list-style: none;
     padding: 0;
     margin: 0;
 }
 
+/* File item */
 .FileItem {
     display: flex;
     justify-content: space-between;
@@ -68,8 +81,6 @@
     border-bottom: 1px solid #333;
     font-size: 0.95rem;
     gap: 0.5rem;
-
-    /* animation support */
     opacity: 1;
     max-height: 60px;
     transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
@@ -79,7 +90,6 @@
     border-bottom: none;
 }
 
-/* Animate removal */
 .FileItem.removing {
     opacity: 0;
     max-height: 0;
@@ -88,16 +98,14 @@
     border: none;
 }
 
-/* File name text */
+/* File name */
 .FileNameText {
     flex: 1;
-    overflow-wrap: anywhere; /* allows breaking anywhere */
     word-break: break-word;
-    white-space: normal; /* multiline wrapping */
     line-height: 1.3;
 }
 
-/* Remove file button */
+/* Remove button */
 .RemoveFileButton {
     background: #db1a1a;
     color: white;
@@ -108,14 +116,14 @@
     font-size: 1rem;
     line-height: 1.2;
     transition: background 0.2s ease;
-    flex-shrink: 0; /* don't shrink the button */
+    flex-shrink: 0;
 }
 
 .RemoveFileButton:hover {
     background: #ff4b4b;
 }
 
-/* Share Files button */
+/* Share button */
 .ShareFilesButton {
     margin-top: 1rem;
     padding: 0.6rem 1.2rem;
@@ -132,31 +140,11 @@
     background-color: #1a5edb;
 }
 
-/* Responsive adjustments */
+/* Responsive */
 @media (max-width: 480px) {
-    .FileInput input[type="file"] {
-        width: 95%;
-        font-size: 0.95rem;
-    }
-
-    .FileList {
-        max-width: 95%;
-        padding: 0.6rem;
-        max-height: 10rem;
-    }
-
-    .FileItem {
-        font-size: 0.9rem;
-        padding: 0.4rem 0.5rem;
-    }
-
-    .RemoveFileButton {
-        font-size: 0.9rem;
-        padding: 0 0.4rem;
-    }
-
-    .ShareFilesButton {
-        font-size: 0.95rem;
-        padding: 0.55rem 1rem;
-    }
+    .FileInput input[type="file"] { width: 95%; font-size: 0.95rem; }
+    .FileList { max-width: 95%; padding: 0.6rem; max-height: 10rem; }
+    .FileItem { font-size: 0.9rem; padding: 0.4rem 0.5rem; }
+    .RemoveFileButton { font-size: 0.9rem; padding: 0 0.4rem; }
+    .ShareFilesButton, .SecondaryLink { font-size: 0.95rem; padding: 0.55rem 1rem; }
 }

@@ -45,7 +45,7 @@ const FileSender = () => {
     const [fileId, setFileId] = useState(null);
     const [fileName, setFileName] = useState(null);
     const [fileSize, setFileSize] = useState(0);
-    const [sendChunkSize, setSendChunkSize] = useState(2 * 1024 * 1024); // default 2 MB
+    const [sendChunkSize, setSendChunkSize] = useState(256 * 1024);
 
     const log = useLogger();
 

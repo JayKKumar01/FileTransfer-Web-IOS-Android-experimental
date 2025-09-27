@@ -1,4 +1,4 @@
-import React, { useState, useRef, useContext } from "react";
+import React, { useState, useContext } from "react";
 import { LogContext } from "../contexts/LogContext";
 import { createStore, saveChunk, getBlob, clearChunks, getName } from "../utils/chunkUtil";
 
@@ -10,8 +10,7 @@ const useLogger = () => {
     };
 };
 
-const sendChunkSize = 1024 * 256; // 256KB per send slice
-const storeChunkSize = 1024 * 1024 * 2; // 2MB per store chunk
+const sendChunkSize = 1024 * 1024 * 2;
 
 const FileSender = () => {
     const [sendProgress, setSendProgress] = useState(0);
@@ -21,54 +20,7 @@ const FileSender = () => {
     const [fileName, setFileName] = useState(null);
     const [fileSize, setFileSize] = useState(0);
 
-    const memoryBufferRef = useRef([]);
-    const bufferSizeRef = useRef(0);
     const log = useLogger();
-
-    const readSliceAsArrayBuffer = (blobSlice) =>
-        new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsArrayBuffer(blobSlice);
-        });
-
-    // Simulate receiving chunk and flush to store when buffer exceeds storeChunkSize
-    const receiveChunk = async (fileId, arrayBuffer) => {
-        memoryBufferRef.current.push(arrayBuffer);
-        bufferSizeRef.current += arrayBuffer.byteLength;
-
-        if (bufferSizeRef.current >= storeChunkSize) {
-            // Combine all ArrayBuffers into one
-            const totalLength = bufferSizeRef.current;
-            const combined = new Uint8Array(totalLength);
-            let offset = 0;
-            for (const buf of memoryBufferRef.current) {
-                combined.set(new Uint8Array(buf), offset);
-                offset += buf.byteLength;
-            }
-
-            await saveChunk(fileId, combined.buffer);
-            memoryBufferRef.current = [];
-            bufferSizeRef.current = 0;
-        }
-    };
-
-    // Flush remaining buffer to DB
-    const flushRemainingBuffer = async (fileId) => {
-        if (memoryBufferRef.current.length > 0) {
-            const totalLength = bufferSizeRef.current;
-            const combined = new Uint8Array(totalLength);
-            let offset = 0;
-            for (const buf of memoryBufferRef.current) {
-                combined.set(new Uint8Array(buf), offset);
-                offset += buf.byteLength;
-            }
-            await saveChunk(fileId, combined.buffer);
-            memoryBufferRef.current = [];
-            bufferSizeRef.current = 0;
-        }
-    };
 
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
@@ -80,26 +32,17 @@ const FileSender = () => {
         setFileName(file.name);
         setFileSize(file.size);
 
-        memoryBufferRef.current = [];
-        bufferSizeRef.current = 0;
-
         try {
             await createStore(newFileId, file.name);
 
             let offset = 0;
             while (offset < file.size) {
                 const slice = file.slice(offset, offset + sendChunkSize);
-                const arrayBuffer = await readSliceAsArrayBuffer(slice);
-
-                // Simulate receiving
-                await receiveChunk(newFileId, arrayBuffer);
+                await saveChunk(newFileId, slice); // Directly save Blob slice
 
                 offset += sendChunkSize;
                 setSendProgress(Math.min(100, Math.round((offset / file.size) * 100)));
             }
-
-            // Flush any remaining buffer
-            await flushRemainingBuffer(newFileId);
 
             setStatus("completed");
             log(`✅ File sent → fileId: ${newFileId}, size: ${file.size} bytes`);
@@ -162,7 +105,6 @@ const FileSender = () => {
                 </p>
             )}
 
-            {/* Sending progress */}
             <div style={{ marginTop: "10px" }}>
                 <div style={{ height: "20px", width: "100%", background: "#eee", borderRadius: "10px", overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${sendProgress}%`, background: "#4caf50", transition: "width 0.2s" }} />
@@ -173,7 +115,6 @@ const FileSender = () => {
                 </p>
             </div>
 
-            {/* Assembling progress */}
             {status === "assembling" && (
                 <div style={{ marginTop: "10px" }}>
                     <div style={{ height: "20px", width: "100%", background: "#eee", borderRadius: "10px", overflow: "hidden" }}>

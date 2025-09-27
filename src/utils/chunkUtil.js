@@ -1,5 +1,8 @@
-const DB_NAME = "JayKKumar01-FileTransferDB-001";
+const DB_NAME = "JayKKumar01-FileTransferDB-002";
 const META_STORE = "fileMeta";
+
+// Detect iOS
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 // Open DB
 const openDB = (version) =>
@@ -39,19 +42,26 @@ export const createStore = async (fileId, fileName) => {
     await setName(fileId, fileName);
 };
 
-// Save chunk (order preserved automatically)
+// Save chunk (iOS: ArrayBuffer, others: Blob)
 export const saveChunk = async (fileId, chunk) => {
     const db = await openDB();
+    let dataToStore = chunk;
+
+    if (isIOS) {
+        // Convert Blob to ArrayBuffer for iOS
+        dataToStore = await chunk.arrayBuffer();
+    }
+
     return new Promise((resolve, reject) => {
         const tx = db.transaction([fileId], "readwrite");
         const store = tx.objectStore(fileId);
-        const req = store.add(chunk);
+        const req = store.add(dataToStore);
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
     });
 };
 
-// Get file name
+// Save file name in meta store
 export const setName = async (fileId, name) => {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -63,6 +73,7 @@ export const setName = async (fileId, name) => {
     });
 };
 
+// Get file name
 export const getName = async (fileId) => {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -96,7 +107,13 @@ export const getBlob = async (fileId, type = "application/octet-stream", onProgr
         request.onsuccess = (event) => {
             const cursor = event.target.result;
             if (cursor) {
-                blobParts.push(new Blob([cursor.value]));
+                if (isIOS) {
+                    blobParts.push(new Blob([cursor.value], { type }));
+                } else {
+                    // Non-iOS: cursor.value is already Blob
+                    blobParts.push(cursor.value);
+                }
+
                 processed++;
                 if (onProgress) onProgress(processed, totalChunks);
                 cursor.continue();

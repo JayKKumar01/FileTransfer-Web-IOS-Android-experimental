@@ -1,6 +1,15 @@
 import React, { useState, useContext } from "react";
 import { LogContext } from "../contexts/LogContext";
-import { createStore, saveChunk, getBlob, clearChunks, getName, flush } from "../utils/chunkUtil";
+import {
+    deleteDatabase,
+    createStore,
+    saveChunk,
+    getBlob,
+    clearChunks,
+    getName,
+    flush,
+    getInfo, refreshIOSStorage
+} from "../utils/chunkUtil";
 
 const useLogger = () => {
     const { pushLog } = useContext(LogContext);
@@ -19,6 +28,15 @@ const chunkOptions = [
     { label: "2 MB", value: 2 * 1024 * 1024 },
     { label: "4 MB", value: 4 * 1024 * 1024 },
 ];
+
+// --- File chunk generator ---
+async function* chunkFile(file, size) {
+    let offset = 0;
+    while (offset < file.size) {
+        yield file.slice(offset, offset + size);
+        offset += size;
+    }
+}
 
 const FileSender = () => {
     const [sendProgress, setSendProgress] = useState(0);
@@ -44,15 +62,22 @@ const FileSender = () => {
         try {
             await createStore(newFileId, file.name);
 
-            let offset = 0;
-            while (offset < file.size) {
-                const slice = file.slice(offset, offset + sendChunkSize);
-                await saveChunk(newFileId, slice); // Directly save Blob slice
-                offset += sendChunkSize;
-                setSendProgress(Math.min(100, Math.round((offset / file.size) * 100)));
+            let processed = 0;
+            let lastPercent = 0;
+
+            for await (const slice of chunkFile(file, sendChunkSize)) {
+                await saveChunk(newFileId, slice);
+                processed += slice.size;
+
+                // update progress only when percent actually changes
+                const percent = Math.floor((processed / file.size) * 100);
+                if (percent !== lastPercent) {
+                    lastPercent = percent;
+                    setSendProgress(percent);
+                }
             }
 
-            await flush(newFileId); // flush remaining memory chunks
+            await flush(newFileId);
 
             setStatus("completed");
             log(`✅ File sent → fileId: ${newFileId}, size: ${file.size} bytes`);
@@ -71,30 +96,46 @@ const FileSender = () => {
         try {
             const name = await getName(fileId);
             const assembledBlob = await getBlob(fileId, "application/octet-stream", (processed, total) => {
-                setAssembleProgress(Math.min(100, Math.round((processed / total) * 100)));
+                const percent = Math.floor((processed / total) * 100);
+                setAssembleProgress(percent);
             });
 
-            const url = URL.createObjectURL(assembledBlob);
-            const a = document.createElement("a");
+            let url = URL.createObjectURL(assembledBlob);
+            let a = document.createElement("a");
             a.href = url;
             a.download = name;
             a.style.display = "none";
             document.body.appendChild(a);
             a.click();
+            // Force garbage collection by revoking URL and removing element
             setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
+
+                // Nullify references to help garbage collection
+                a = null;
+                url = null;
             }, 100);
 
             log(`⬇️ Downloaded: ${name}, size: ${assembledBlob.size}`);
-            await clearChunks(fileId);
 
+            // reset state
             setFileId(null);
             setFileName(null);
             setFileSize(0);
             setSendProgress(0);
             setAssembleProgress(0);
             setStatus("idle");
+
+            const afterInfo = await getInfo(fileId);
+            log('After clear:\n' + JSON.stringify(afterInfo, null, 2));
+
+            const refreshed = await refreshIOSStorage();
+            if (refreshed) {
+                log("iOS storage view refreshed successfully.");
+            }
+
+
         } catch (err) {
             log(`❌ Error downloading file: ${err.message}`);
             setStatus("error");

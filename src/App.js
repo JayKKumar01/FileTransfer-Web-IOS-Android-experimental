@@ -13,7 +13,7 @@ import ReceiveFiles from "./components/ReceiveFiles";
 import FileChunkTest from "./components/FileChunkTest";
 import FileSenderTest from "./components/FileSenderTest"; // ✅ test component
 
-import { deleteDatabase } from "./utils/chunkUtil"; // import your delete function
+import {deleteDatabase} from "./utils/chunkUtil"; // import your delete function
 
 // ✅ Delete DB immediately at app start
 deleteDatabase()

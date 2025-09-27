@@ -2,15 +2,11 @@ const DB_NAME = "JayKKumar01-FileTransferDB";
 const META_STORE = "fileMeta";
 const CHUNK_STORE = "fileChunks";
 
-// Detect iOS
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-// Singleton DB instance
 let dbInstance = null;
-
-// In-memory buffer for batching chunks
 const memoryChunks = {}; // { fileId: { chunks: [], size: 0 } }
-const CHUNK_THRESHOLD = 2 * 1024 * 1024; // 2MB
+const CHUNK_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // Delete DB
 export const deleteDatabase = () =>
@@ -50,13 +46,65 @@ const openDB = () =>
         };
     });
 
-// Create store (metadata + memory buffer)
-export const createStore = async (fileId, fileName) => {
-    await setName(fileId, fileName);
-    memoryChunks[fileId] = { chunks: [], size: 0 }; // init memory buffer
+// Get database info for a specific file
+export const getInfo = async (fileId) => {
+    try {
+        // Memory chunks info
+        const memoryInfo = memoryChunks[fileId] ? {
+            count: memoryChunks[fileId].chunks.length,
+            size: memoryChunks[fileId].size
+        } : { count: 0, size: 0 };
+
+        // Database chunks info
+        let dbCount = 0;
+        let dbSize = 0;
+
+        const db = await openDB();
+        const tx = db.transaction([CHUNK_STORE], "readonly");
+        const index = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+
+        return new Promise((resolve, reject) => {
+            const request = index.openCursor(IDBKeyRange.only(fileId));
+
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    dbCount++;
+                    if (cursor.value.data && cursor.value.data.byteLength) {
+                        dbSize += cursor.value.data.byteLength;
+                    }
+                    cursor.continue();
+                } else {
+                    resolve({
+                        fileId,
+                        memoryChunks: memoryInfo,
+                        databaseChunks: {
+                            count: dbCount,
+                            size: dbSize
+                        },
+                        total: {
+                            count: memoryInfo.count + dbCount,
+                            size: memoryInfo.size + dbSize
+                        }
+                    });
+                }
+            };
+
+            request.onerror = () => reject(request.error);
+        });
+    } catch (error) {
+        console.error('Error getting file info:', error);
+        throw error;
+    }
 };
 
-// Save chunk (in-memory batching)
+// Create store
+export const createStore = async (fileId, fileName) => {
+    await setName(fileId, fileName);
+    memoryChunks[fileId] = { chunks: [], size: 0 };
+};
+
+// Save chunk
 export const saveChunk = async (fileId, chunk) => {
     memoryChunks[fileId].chunks.push(chunk);
     memoryChunks[fileId].size += chunk.size;
@@ -66,14 +114,13 @@ export const saveChunk = async (fileId, chunk) => {
     }
 };
 
-// Flush memory chunks to IndexedDB (iOS-safe)
+// Flush chunks to DB
 export const flush = async (fileId) => {
     const buffer = memoryChunks[fileId];
     if (!buffer || buffer.chunks.length === 0) return;
 
-    // Prepare data before transaction
     const combinedBlob = new Blob(buffer.chunks);
-    const dataToStore = isIOS ? await combinedBlob.arrayBuffer() : combinedBlob;
+    const dataToStore = await combinedBlob.arrayBuffer();
 
     const db = await openDB();
     const tx = db.transaction([CHUNK_STORE], "readwrite");
@@ -90,13 +137,12 @@ export const flush = async (fileId) => {
     memoryChunks[fileId] = { chunks: [], size: 0 };
 };
 
-// Set file name in meta
+// Set file name
 export const setName = async (fileId, name) => {
     const db = await openDB();
     const tx = db.transaction([META_STORE], "readwrite");
     const store = tx.objectStore(META_STORE);
     store.put({ fileId, name });
-
     return new Promise((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
@@ -116,13 +162,15 @@ export const getName = async (fileId) => {
     });
 };
 
-// Get final Blob with progress
+// Get final Blob progressively, deleting chunks immediately
 export const getBlob = async (fileId, type = "application/octet-stream", onProgress) => {
-    await flush(fileId); // flush remaining memory chunks
+    await flush(fileId);
 
     const db = await openDB();
+    const blobParts = [];
+    let processed = 0;
 
-    // Count total chunks
+    // Count total chunks first
     const totalChunks = await new Promise((resolve, reject) => {
         const tx = db.transaction([CHUNK_STORE], "readonly");
         const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
@@ -132,18 +180,19 @@ export const getBlob = async (fileId, type = "application/octet-stream", onProgr
     });
 
     return new Promise((resolve, reject) => {
-        const tx = db.transaction([CHUNK_STORE], "readonly");
+        const tx = db.transaction([CHUNK_STORE], "readwrite");
         const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
         const request = store.openCursor(IDBKeyRange.only(fileId));
-        const blobParts = [];
-        let processed = 0;
 
         request.onsuccess = (event) => {
             const cursor = event.target.result;
             if (cursor) {
-                blobParts.push(isIOS ? new Blob([cursor.value.data], { type }) : cursor.value.data);
+                const data = cursor.value.data;
+                blobParts.push(new Blob([data], { type }));
                 processed++;
+                cursor.delete();
                 if (onProgress) onProgress(processed, totalChunks);
+
                 cursor.continue();
             } else {
                 resolve(new Blob(blobParts, { type }));
@@ -154,26 +203,19 @@ export const getBlob = async (fileId, type = "application/octet-stream", onProgr
     });
 };
 
-// Clear all chunks (iOS-safe)
-export const clearChunks = async (fileId) => {
-    memoryChunks[fileId] = { chunks: [], size: 0 };
+export const refreshIOSStorage = () =>
+    new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME);
 
-    const db = await openDB();
-    const tx = db.transaction([CHUNK_STORE], "readwrite");
-    const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+        request.onsuccess = () => {
+            try {
+                const db = request.result;
+                db.close(); // close immediately
+                resolve(true); // success feedback
+            } catch (err) {
+                reject(err);
+            }
+        };
 
-    const request = store.openCursor(IDBKeyRange.only(fileId));
-    request.onsuccess = (event) => {
-        const cursor = event.target.result;
-        if (cursor) {
-            cursor.delete();
-            cursor.continue();
-        }
-    };
-
-    await new Promise((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-        tx.onabort = () => reject(tx.error);
+        request.onerror = () => reject(request.error);
     });
-};

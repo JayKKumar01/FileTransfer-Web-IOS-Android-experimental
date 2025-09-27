@@ -6,6 +6,7 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 let dbInstance = null;
 const memoryChunks = {}; // { fileId: { chunks: [], size: 0 } }
+const CHUNK_SIZE = 256 * 1024;
 const CHUNK_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // Delete DB
@@ -111,15 +112,33 @@ export const saveChunk = async (fileId, chunk) => {
 
     if (memoryChunks[fileId].size >= CHUNK_THRESHOLD) {
         await flush(fileId);
+        // await flushTest(fileId);
     }
 };
+
+export const flushTest = async (fileId) => {
+    const buffer = memoryChunks[fileId];
+    if (!buffer || buffer.chunks.length === 0) return;
+
+    // Release memory chunks immediately
+    const chunks = buffer.chunks;
+    memoryChunks[fileId] = {chunks: [], size: 0};
+
+    const combinedBlob = new Blob(chunks);
+    const dataToStore = await combinedBlob.arrayBuffer();
+    console.log('dataToStore', dataToStore.byteLength);
+}
 
 // Flush chunks to DB
 export const flush = async (fileId) => {
     const buffer = memoryChunks[fileId];
     if (!buffer || buffer.chunks.length === 0) return;
 
-    const combinedBlob = new Blob(buffer.chunks);
+    // Release memory chunks immediately
+    const chunks = buffer.chunks;
+    memoryChunks[fileId] = { chunks: [], size: 0 };
+
+    const combinedBlob = new Blob(chunks);
     const dataToStore = await combinedBlob.arrayBuffer();
 
     const db = await openDB();
@@ -133,8 +152,6 @@ export const flush = async (fileId) => {
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error);
     });
-
-    memoryChunks[fileId] = { chunks: [], size: 0 };
 };
 
 // Set file name

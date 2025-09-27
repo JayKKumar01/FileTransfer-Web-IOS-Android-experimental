@@ -10,7 +10,7 @@ export const LogProvider = ({ children }) => {
 
     // Memoized pushLog prevents re-renders triggering useEffect loops
     const pushLog = useCallback((msg) => {
-        setLogMessages((prev) => [...prev, msg].slice(-50));
+        setLogMessages((prev) => [...prev, msg]);
     }, []);
 
     return (

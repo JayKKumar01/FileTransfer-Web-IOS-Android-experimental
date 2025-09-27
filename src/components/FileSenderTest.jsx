@@ -1,6 +1,6 @@
 import React, { useState, useContext } from "react";
 import { LogContext } from "../contexts/LogContext";
-import { createStore, saveChunk, getBlob, clearChunks, getName } from "../utils/chunkUtil";
+import { createStore, saveChunk, getBlob, clearChunks, getName, flush } from "../utils/chunkUtil";
 
 const useLogger = () => {
     const { pushLog } = useContext(LogContext);
@@ -10,7 +10,15 @@ const useLogger = () => {
     };
 };
 
-const sendChunkSize = 1024 * 1024 * 2;
+const chunkOptions = [
+    { label: "64 KB", value: 64 * 1024 },
+    { label: "128 KB", value: 128 * 1024 },
+    { label: "256 KB", value: 256 * 1024 },
+    { label: "512 KB", value: 512 * 1024 },
+    { label: "1 MB", value: 1024 * 1024 },
+    { label: "2 MB", value: 2 * 1024 * 1024 },
+    { label: "4 MB", value: 4 * 1024 * 1024 },
+];
 
 const FileSender = () => {
     const [sendProgress, setSendProgress] = useState(0);
@@ -19,6 +27,7 @@ const FileSender = () => {
     const [fileId, setFileId] = useState(null);
     const [fileName, setFileName] = useState(null);
     const [fileSize, setFileSize] = useState(0);
+    const [sendChunkSize, setSendChunkSize] = useState(2 * 1024 * 1024); // default 2 MB
 
     const log = useLogger();
 
@@ -39,10 +48,11 @@ const FileSender = () => {
             while (offset < file.size) {
                 const slice = file.slice(offset, offset + sendChunkSize);
                 await saveChunk(newFileId, slice); // Directly save Blob slice
-
                 offset += sendChunkSize;
                 setSendProgress(Math.min(100, Math.round((offset / file.size) * 100)));
             }
+
+            await flush(newFileId); // flush remaining memory chunks
 
             setStatus("completed");
             log(`✅ File sent → fileId: ${newFileId}, size: ${file.size} bytes`);
@@ -77,7 +87,6 @@ const FileSender = () => {
             }, 100);
 
             log(`⬇️ Downloaded: ${name}, size: ${assembledBlob.size}`);
-
             await clearChunks(fileId);
 
             setFileId(null);
@@ -99,6 +108,19 @@ const FileSender = () => {
                 onChange={handleFileSelect}
                 style={{ marginBottom: "12px", padding: "6px", border: "1px solid #ccc", borderRadius: "6px" }}
             />
+
+            <select
+                value={sendChunkSize}
+                onChange={(e) => setSendChunkSize(Number(e.target.value))}
+                style={{ marginBottom: "12px", padding: "6px", border: "1px solid #ccc", borderRadius: "6px" }}
+            >
+                {chunkOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                    </option>
+                ))}
+            </select>
+
             {fileSize > 0 && (
                 <p style={{ fontSize: "14px", color: "#666", marginBottom: "10px" }}>
                     File: {fileName} ({Math.round(fileSize / (1024 * 1024))} MB)

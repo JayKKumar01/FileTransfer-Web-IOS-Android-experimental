@@ -1,6 +1,6 @@
 import React, { useState, useRef, useContext } from "react";
 import { LogContext } from "../contexts/LogContext";
-import { createStore, saveChunk, getBlob, clearChunks, getName } from "../utils/chunkUtil";
+import { setItem, getItem, removeItem, clearStore } from "../utils/dbUtil";
 
 const useLogger = () => {
     const { pushLog } = useContext(LogContext);
@@ -10,20 +10,18 @@ const useLogger = () => {
     };
 };
 
-const sendChunkSize = 1024 * 256; // 256KB per send slice
-const storeChunkSize = 1024 * 1024 * 2; // 2MB per store chunk
-
 const FileSender = () => {
     const [sendProgress, setSendProgress] = useState(0);
     const [assembleProgress, setAssembleProgress] = useState(0);
     const [status, setStatus] = useState("idle");
     const [fileId, setFileId] = useState(null);
     const [fileName, setFileName] = useState(null);
+    const [chunkCount, setChunkCount] = useState(0);
     const [fileSize, setFileSize] = useState(0);
 
-    const memoryBufferRef = useRef([]);
-    const bufferSizeRef = useRef(0);
+    const metadataRef = useRef({});
     const log = useLogger();
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     const readSliceAsArrayBuffer = (blobSlice) =>
         new Promise((resolve, reject) => {
@@ -33,78 +31,47 @@ const FileSender = () => {
             reader.readAsArrayBuffer(blobSlice);
         });
 
-    // Simulate receiving chunk and flush to store when buffer exceeds storeChunkSize
-    const receiveChunk = async (fileId, arrayBuffer) => {
-        memoryBufferRef.current.push(arrayBuffer);
-        bufferSizeRef.current += arrayBuffer.byteLength;
-
-        if (bufferSizeRef.current >= storeChunkSize) {
-            // Combine all ArrayBuffers into one
-            const totalLength = bufferSizeRef.current;
-            const combined = new Uint8Array(totalLength);
-            let offset = 0;
-            for (const buf of memoryBufferRef.current) {
-                combined.set(new Uint8Array(buf), offset);
-                offset += buf.byteLength;
-            }
-
-            await saveChunk(fileId, combined.buffer);
-            memoryBufferRef.current = [];
-            bufferSizeRef.current = 0;
-        }
-    };
-
-    // Flush remaining buffer to DB
-    const flushRemainingBuffer = async (fileId) => {
-        if (memoryBufferRef.current.length > 0) {
-            const totalLength = bufferSizeRef.current;
-            const combined = new Uint8Array(totalLength);
-            let offset = 0;
-            for (const buf of memoryBufferRef.current) {
-                combined.set(new Uint8Array(buf), offset);
-                offset += buf.byteLength;
-            }
-            await saveChunk(fileId, combined.buffer);
-            memoryBufferRef.current = [];
-            bufferSizeRef.current = 0;
-        }
+    const sendChunk = async (fileId, index, chunkBlob) => {
+        const arrayBuffer = await readSliceAsArrayBuffer(chunkBlob);
+        await setItem(`${fileId}-${index}`, arrayBuffer);
+        log(`Chunk stored → fileId: ${fileId}, index: ${index}, size: ${arrayBuffer.byteLength} bytes`);
     };
 
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
+        let offset = 0,
+            index = 0;
         const newFileId = Date.now().toString();
+
         setStatus("sending");
         setFileId(newFileId);
         setFileName(file.name);
         setFileSize(file.size);
 
-        memoryBufferRef.current = [];
-        bufferSizeRef.current = 0;
+        metadataRef.current[newFileId] = {
+            name: file.name,
+            totalChunks: 0,
+            type: file.type,
+            totalSize: file.size,
+        };
 
         try {
-            await createStore(newFileId, file.name);
-
-            let offset = 0;
             while (offset < file.size) {
-                const slice = file.slice(offset, offset + sendChunkSize);
-                const arrayBuffer = await readSliceAsArrayBuffer(slice);
+                const slice = file.slice(offset, offset + chunkSize);
+                await sendChunk(newFileId, index, slice);
 
-                // Simulate receiving
-                await receiveChunk(newFileId, arrayBuffer);
+                offset += chunkSize;
+                index++;
+                metadataRef.current[newFileId].totalChunks = index;
 
-                offset += sendChunkSize;
                 setSendProgress(Math.min(100, Math.round((offset / file.size) * 100)));
+                setChunkCount(index);
             }
-
-            // Flush any remaining buffer
-            await flushRemainingBuffer(newFileId);
-
             setStatus("completed");
-            log(`✅ File sent → fileId: ${newFileId}, size: ${file.size} bytes`);
+            log(`✅ File saved → fileId: ${newFileId}, chunks: ${index}, size: ${file.size} bytes`);
         } catch (err) {
-            log(`❌ Error sending file: ${err.message}`);
+            log(`❌ Error saving file: ${err.message}`);
             setStatus("error");
         }
     };
@@ -112,19 +79,31 @@ const FileSender = () => {
     const handleDownload = async () => {
         if (!fileId) return alert("No file available");
 
+        const metadata = metadataRef.current[fileId];
+        if (!metadata) return alert("No metadata found");
+
         setAssembleProgress(0);
         setStatus("assembling");
 
         try {
-            const name = await getName(fileId);
-            const assembledBlob = await getBlob(fileId, "application/octet-stream", (processed, total) => {
-                setAssembleProgress(Math.min(100, Math.round((processed / total) * 100)));
-            });
+            const chunks = [];
 
+            for (let i = 0; i < metadata.totalChunks; i++) {
+                const data = await getItem(`${fileId}-${i}`);
+                if (data) chunks.push(isIos ? new Blob([data]) : data);
+                else log(`⚠️ Missing chunk ${i}`);
+
+                setAssembleProgress(Math.min(100, Math.round(((i + 1) / metadata.totalChunks) * 100)));
+
+                if (i % 5 === 0) await new Promise((res) => setTimeout(res, 0));
+                await removeItem(`${fileId}-${i}`).catch(() => {});
+            }
+
+            const assembledBlob = new Blob(chunks, { type: metadata.type || "application/octet-stream" });
             const url = URL.createObjectURL(assembledBlob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = name;
+            a.download = metadata.name || "downloaded_file";
             a.style.display = "none";
             document.body.appendChild(a);
             a.click();
@@ -133,10 +112,11 @@ const FileSender = () => {
                 URL.revokeObjectURL(url);
             }, 100);
 
-            log(`⬇️ Downloaded: ${name}, size: ${assembledBlob.size}`);
+            log(`⬇️ Downloaded: ${metadata.name}, size: ${assembledBlob.size}`);
 
-            await clearChunks(fileId);
+            await clearStore(); // clear DB after download
 
+            delete metadataRef.current[fileId];
             setFileId(null);
             setFileName(null);
             setFileSize(0);
@@ -158,22 +138,20 @@ const FileSender = () => {
             />
             {fileSize > 0 && (
                 <p style={{ fontSize: "14px", color: "#666", marginBottom: "10px" }}>
-                    File: {fileName} ({Math.round(fileSize / (1024 * 1024))} MB)
+                    File: {fileName} ({Math.round(fileSize / (1024 * 1024))} MB){isIos && " [iOS ArrayBuffer → Blob]"}
                 </p>
             )}
 
-            {/* Sending progress */}
             <div style={{ marginTop: "10px" }}>
                 <div style={{ height: "20px", width: "100%", background: "#eee", borderRadius: "10px", overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${sendProgress}%`, background: "#4caf50", transition: "width 0.2s" }} />
                 </div>
                 <p style={{ marginTop: "6px", fontSize: "14px" }}>
-                    {status === "sending" && `Sending... ${sendProgress}%`}
-                    {status === "completed" && `Ready to download`}
+                    {status === "sending" && `Sending... ${sendProgress}% (${chunkCount} chunks)`}
+                    {status === "completed" && `Ready to download - ${chunkCount} chunks`}
                 </p>
             </div>
 
-            {/* Assembling progress */}
             {status === "assembling" && (
                 <div style={{ marginTop: "10px" }}>
                     <div style={{ height: "20px", width: "100%", background: "#eee", borderRadius: "10px", overflow: "hidden" }}>

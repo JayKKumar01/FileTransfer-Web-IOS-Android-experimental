@@ -1,347 +1,386 @@
-import React, { useState, useContext, useEffect, useRef } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { LogContext } from "../contexts/LogContext";
 import {
     createStore,
     saveChunk,
-    getName,
-    flush,
-    getInfo,
     downloadFile,
-    downloadFileManual,
-    setChunkUtilLogger
+    setChunkUtilLogger,
+    clearFileData
 } from "../utils/chunkUtil";
 
-const useLogger = () => {
-    const { pushLog } = useContext(LogContext);
-    return (msg) => {
-        console.log(msg);
-        pushLog(msg);
-    };
-};
-
-const CHUNK_SIZE = 256 * 1024; // 256 KB
-const getOptimalBatch = (fileSizeMB) => (fileSizeMB >= 8 ? 8 : fileSizeMB);
-const ANDROID_REGEX = /Android/i;
-const isAndroid = ANDROID_REGEX.test(navigator.userAgent);
+const CHUNK_SIZE = 256 * 1024; // 256KB
 
 const FileSender = () => {
-    const [sendProgress, setSendProgress] = useState(0);
-    const [downloadProgress, setDownloadProgress] = useState(0);
-    const [status, setStatus] = useState("idle");
+    const [currentFile, setCurrentFile] = useState(null);
     const [fileId, setFileId] = useState(null);
-    const [fileName, setFileName] = useState(null);
-    const [fileSize, setFileSize] = useState(0);
-    const [isDownloading, setIsDownloading] = useState(false);
+    const [storeProgress, setStoreProgress] = useState(0);
+    const [downloadProgress, setDownloadProgress] = useState(0);
+    const [status, setStatus] = useState("idle"); // idle, storing, ready, downloading, error
+    const [isProcessing, setIsProcessing] = useState(false);
 
-    const log = useLogger();
-    const logRef = useRef(log);
+    const { pushLog } = useContext(LogContext);
 
-    // Update ref when log changes
+    // Enhanced logger that ensures all messages go to UI
+    const log = (message) => {
+        console.log(message);
+        pushLog(message);
+    };
+
+    // Setup chunkUtil logger
     useEffect(() => {
-        logRef.current = log;
-    }, [log]);
-
-    // Set up the chunkUtil logger when component mounts
-    useEffect(() => {
-        setChunkUtilLogger((message) => {
-            logRef.current(message);
-        });
+        setChunkUtilLogger(log);
     }, []);
 
-    // Enhanced logging function that ensures all logs go through
-    const enhancedLog = (message) => {
-        logRef.current(message);
-    };
-
-    const processBuffer = async (buffer, fileSize, offsetStart = 0, newFileId) => {
-        let offset = offsetStart;
-        let lastPercent = Math.floor((offset / fileSize) * 100);
-
-        for (let i = 0; i < buffer.byteLength; i += CHUNK_SIZE) {
-            const end = Math.min(i + CHUNK_SIZE, buffer.byteLength);
-            const chunk = buffer.slice(i, end);
-
-            await saveChunk(newFileId, chunk);
-
-            offset += chunk.byteLength;
-
-            const percent = Math.floor((offset / fileSize) * 100);
-            if (percent !== lastPercent) {
-                lastPercent = percent;
-                setSendProgress(percent);
-            }
-        }
-
-        return offset;
-    };
-
-    const handleFileSelect = async (e) => {
-        const file = e.target.files[0];
+    // Handle file selection
+    const handleFileSelect = async (event) => {
+        const file = event.target.files[0];
         if (!file) return;
 
-        // Reset any previous download state
-        setIsDownloading(false);
+        // Reset state
+        setCurrentFile(file);
+        setStoreProgress(0);
         setDownloadProgress(0);
+        setStatus("idle");
+        setFileId(null);
 
-        const newFileId = Date.now().toString();
-        setStatus("sending");
+        log(`📁 Selected: ${file.name} (${formatFileSize(file.size)})`);
+
+        // Auto-start processing
+        await handleStartProcessing(file);
+    };
+
+    // Format file size for display
+    const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    // Process the file and store chunks
+    const handleStartProcessing = async (file) => {
+        if (!file || isProcessing) return;
+
+        setIsProcessing(true);
+        setStatus("storing");
+
+        const newFileId = `file_${Date.now()}`;
         setFileId(newFileId);
-        setFileName(file.name);
-        setFileSize(file.size);
-
-        enhancedLog(`📁 Selected file: ${file.name} (${Math.round(file.size / (1024 * 1024))} MB)`);
 
         try {
-            enhancedLog(`🗃️ Creating store for fileId: ${newFileId}`);
+            log(`🚀 Starting file processing...`);
             await createStore(newFileId, file.name);
 
-            let offset = 0;
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            let processedChunks = 0;
 
-            if (isAndroid) {
-                const fileSizeMB = file.size / (1024 * 1024);
-                const batchSizeMB = getOptimalBatch(fileSizeMB);
-                const batchBytes = Math.min(batchSizeMB * 1024 * 1024, file.size);
-                enhancedLog(`🤖 Using Android batch reading (${batchSizeMB} MB batches)`);
+            log(`🔪 Splitting file into ${totalChunks} chunks of ${CHUNK_SIZE / 1024}KB each`);
 
-                while (offset < file.size) {
-                    const slice = file.slice(offset, Math.min(offset + batchBytes, file.size));
-                    const buffer = await slice.arrayBuffer();
-                    offset = await processBuffer(buffer, file.size, offset, newFileId);
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
 
-                    // Yield for UI
-                    await new Promise((r) => setTimeout(r, 0));
+                // Convert to ArrayBuffer
+                const arrayBuffer = await chunk.arrayBuffer();
+
+                // Store the chunk
+                await saveChunk(newFileId, arrayBuffer, chunkIndex);
+
+                processedChunks++;
+
+                // Update progress
+                const progress = Math.round((processedChunks / totalChunks) * 100);
+                setStoreProgress(progress);
+
+                // Log every 5% or for small files, every chunk
+                if (progress % 5 === 0 || totalChunks < 20) {
+                    log(`💾 Stored chunk ${processedChunks}/${totalChunks} (${progress}%)`);
                 }
-            } else {
-                enhancedLog(`🖥️ Using sequential reading (256 KB chunks)`);
-                while (offset < file.size) {
-                    const slice = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
-                    const buffer = await slice.arrayBuffer();
-                    offset = await processBuffer(buffer, file.size, offset, newFileId);
+
+                // Yield to UI to prevent blocking
+                if (chunkIndex % 10 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
                 }
             }
 
-            enhancedLog(`🧹 Flushing remaining chunks...`);
-            await flush(newFileId);
-            setSendProgress(100);
-
             setStatus("ready");
-            enhancedLog(`✅ File stored → fileId: ${newFileId}, size: ${file.size} bytes`);
+            log(`✅ File processing complete! Ready for download.`);
 
-            // Log storage info
-            enhancedLog(`📊 Getting storage info...`);
-            const info = await getInfo(newFileId);
-            enhancedLog("Storage info:\n" + JSON.stringify(info, null, 2));
-        } catch (err) {
-            enhancedLog(`❌ Error storing file: ${err.message}`);
+        } catch (error) {
+            log(`❌ Error processing file: ${error.message}`);
             setStatus("error");
+
+            // Clean up on error
+            if (newFileId) {
+                await clearFileData(newFileId);
+            }
+        } finally {
+            setIsProcessing(false);
         }
     };
 
+    // Handle download
     const handleDownload = async () => {
-        if (!fileId || isDownloading) return;
+        if (!fileId || status !== "ready") return;
 
-        setIsDownloading(true);
-        setDownloadProgress(0);
+        setIsProcessing(true);
         setStatus("downloading");
-
-        enhancedLog(`🚀 Starting download process...`);
+        setDownloadProgress(0);
 
         try {
-            const name = await getName(fileId);
-            enhancedLog(`⬇️ Starting download: ${name}`);
+            log(`⬇️ Starting download process...`);
 
-            let lastPercent = 0;
-            let progressLogCount = 0;
+            await downloadFile(fileId, (progress, processed, total) => {
+                setDownloadProgress(progress);
 
-            // Use manual download for better memory control with large files
-            await downloadFileManual(fileId, (processed, total) => {
-                const percent = Math.floor((processed / total) * 100);
-                if (percent !== lastPercent) {
-                    setDownloadProgress(percent);
-
-                    // Log progress at key intervals to avoid spam
-                    if (percent % 10 === 0 || processed === total || processed === 1) {
-                        enhancedLog(`📦 Download Progress: ${percent}% (${processed}/${total} records)`);
-                        progressLogCount++;
-                    }
+                // Log key progress points
+                if (progress % 10 === 0 || processed === total) {
+                    log(`📦 Download: ${progress}% (${processed}/${total} chunks)`);
                 }
-                lastPercent = percent;
             });
 
-            enhancedLog(`✅ Download completed: ${name}`);
-            enhancedLog(`📈 Total progress updates logged: ${progressLogCount}`);
+            log(`🎉 Download completed successfully!`);
 
-            // Clean up and reset state
-            await resetState();
+            // Reset for next file
+            setStatus("idle");
+            setCurrentFile(null);
+            setFileId(null);
+            setStoreProgress(0);
+            setDownloadProgress(0);
 
-        } catch (err) {
-            enhancedLog(`❌ Error downloading file: ${err.message}`);
+        } catch (error) {
+            log(`❌ Download failed: ${error.message}`);
             setStatus("error");
-            setIsDownloading(false);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
-    const handleCancelDownload = () => {
-        enhancedLog(`⏹️ Download cancellation requested`);
-        setIsDownloading(false);
-        setStatus("ready");
-    };
+    // Handle cancel/clear
+    const handleClear = async () => {
+        if (fileId) {
+            await clearFileData(fileId);
+            log(`🧹 Cleared stored data for file ${fileId}`);
+        }
 
-    const resetState = async () => {
-        enhancedLog(`🔄 Resetting application state...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
+        setCurrentFile(null);
         setFileId(null);
-        setFileName(null);
-        setFileSize(0);
-        setSendProgress(0);
+        setStoreProgress(0);
         setDownloadProgress(0);
         setStatus("idle");
-        setIsDownloading(false);
-
-        enhancedLog(`🔄 Application state reset complete`);
+        setIsProcessing(false);
     };
 
     const getStatusMessage = () => {
         switch (status) {
-            case "sending":
-                return `Storing... ${sendProgress}%`;
-            case "ready":
-                return "Ready to download";
-            case "downloading":
-                return `Downloading... ${downloadProgress}%`;
-            case "completed":
-                return "Download completed!";
-            case "error":
-                return "Error occurred";
-            default:
-                return "Select a file to begin";
+            case "idle": return "Select a file to begin";
+            case "storing": return `Processing file... ${storeProgress}%`;
+            case "ready": return "Ready to download";
+            case "downloading": return `Downloading... ${downloadProgress}%`;
+            case "error": return "An error occurred";
+            default: return "Ready";
         }
     };
-
-    const getButtonConfig = () => {
-        if (status === "downloading") {
-            return {
-                text: "Cancel Download",
-                onClick: handleCancelDownload,
-                bgColor: "#ff5722",
-                disabled: false
-            };
-        } else if (fileId && status !== "sending") {
-            return {
-                text: `Download ${fileName}`,
-                onClick: handleDownload,
-                bgColor: "#2196f3",
-                disabled: isDownloading
-            };
-        } else {
-            return {
-                text: "No File Available",
-                onClick: null,
-                bgColor: "#aaa",
-                disabled: true
-            };
-        }
-    };
-
-    const buttonConfig = getButtonConfig();
 
     return (
-        <div style={{ padding: "16px", fontFamily: "Arial" }}>
-            <input
-                type="file"
-                onChange={handleFileSelect}
-                disabled={status === "sending" || status === "downloading"}
-                style={{
-                    marginBottom: "12px",
-                    padding: "6px",
-                    border: "1px solid #ccc",
-                    borderRadius: "6px",
-                    opacity: (status === "sending" || status === "downloading") ? 0.6 : 1
-                }}
-            />
+        <div style={{
+            padding: "20px",
+            fontFamily: "Arial, sans-serif",
+            maxWidth: "600px",
+            margin: "0 auto"
+        }}>
+            <h2 style={{ marginBottom: "20px", color: "#333" }}>
+                File Transfer (iOS Optimized)
+            </h2>
 
-            {fileSize > 0 && (
-                <p style={{ fontSize: "14px", color: "#666", marginBottom: "10px" }}>
-                    File: {fileName} ({Math.round(fileSize / (1024 * 1024))} MB)
-                </p>
+            {/* File Input */}
+            <div style={{ marginBottom: "20px" }}>
+                <input
+                    type="file"
+                    onChange={handleFileSelect}
+                    disabled={isProcessing}
+                    style={{
+                        padding: "10px",
+                        border: "2px dashed #ccc",
+                        borderRadius: "8px",
+                        width: "100%",
+                        backgroundColor: isProcessing ? "#f5f5f5" : "white"
+                    }}
+                />
+            </div>
+
+            {/* File Info */}
+            {currentFile && (
+                <div style={{
+                    padding: "15px",
+                    backgroundColor: "#f8f9fa",
+                    borderRadius: "8px",
+                    marginBottom: "15px",
+                    border: "1px solid #e9ecef"
+                }}>
+                    <h4 style={{ margin: "0 0 8px 0", color: "#495057" }}>
+                        {currentFile.name}
+                    </h4>
+                    <p style={{ margin: 0, color: "#6c757d", fontSize: "14px" }}>
+                        Size: {formatFileSize(currentFile.size)}
+                        {fileId && ` • ID: ${fileId}`}
+                    </p>
+                </div>
             )}
 
             {/* Storage Progress */}
-            {status === "sending" && (
-                <div style={{ marginTop: "10px" }}>
-                    <div style={{ height: "20px", width: "100%", background: "#eee", borderRadius: "10px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${sendProgress}%`, background: "#4caf50", transition: "width 0.2s" }} />
+            {status === "storing" && (
+                <div style={{ marginBottom: "15px" }}>
+                    <div style={{
+                        height: "20px",
+                        backgroundColor: "#e9ecef",
+                        borderRadius: "10px",
+                        overflow: "hidden"
+                    }}>
+                        <div style={{
+                            height: "100%",
+                            width: `${storeProgress}%`,
+                            backgroundColor: "#28a745",
+                            transition: "width 0.3s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "white",
+                            fontSize: "12px",
+                            fontWeight: "bold"
+                        }}>
+                            {storeProgress}%
+                        </div>
                     </div>
-                    <p style={{ marginTop: "6px", fontSize: "14px" }}>
-                        Storing file... {sendProgress}%
+                    <p style={{
+                        margin: "8px 0 0 0",
+                        fontSize: "14px",
+                        color: "#495057",
+                        textAlign: "center"
+                    }}>
+                        Processing file... {storeProgress}%
                     </p>
                 </div>
             )}
 
             {/* Download Progress */}
             {status === "downloading" && (
-                <div style={{ marginTop: "10px" }}>
-                    <div style={{ height: "20px", width: "100%", background: "#eee", borderRadius: "10px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${downloadProgress}%`, background: "#ff9800", transition: "width 0.2s" }} />
+                <div style={{ marginBottom: "15px" }}>
+                    <div style={{
+                        height: "20px",
+                        backgroundColor: "#e9ecef",
+                        borderRadius: "10px",
+                        overflow: "hidden"
+                    }}>
+                        <div style={{
+                            height: "100%",
+                            width: `${downloadProgress}%`,
+                            backgroundColor: "#007bff",
+                            transition: "width 0.3s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "white",
+                            fontSize: "12px",
+                            fontWeight: "bold"
+                        }}>
+                            {downloadProgress}%
+                        </div>
                     </div>
-                    <p style={{ marginTop: "6px", fontSize: "14px" }}>
+                    <p style={{
+                        margin: "8px 0 0 0",
+                        fontSize: "14px",
+                        color: "#495057",
+                        textAlign: "center"
+                    }}>
                         Downloading... {downloadProgress}%
                     </p>
                 </div>
             )}
 
             {/* Status Message */}
-            <p style={{
-                marginTop: "10px",
-                fontSize: "14px",
-                color: status === "error" ? "#f44336" : "#666",
-                fontWeight: status === "error" ? "bold" : "normal"
+            <div style={{
+                padding: "12px",
+                backgroundColor: status === "error" ? "#f8d7da" :
+                    status === "ready" ? "#d1ecf1" : "#e2e3e5",
+                border: `1px solid ${
+                    status === "error" ? "#f5c6cb" :
+                        status === "ready" ? "#bee5eb" : "#d6d8db"
+                }`,
+                borderRadius: "6px",
+                marginBottom: "15px",
+                textAlign: "center"
             }}>
-                {getStatusMessage()}
-            </p>
+                <p style={{
+                    margin: 0,
+                    color: status === "error" ? "#721c24" :
+                        status === "ready" ? "#0c5460" : "#383d41",
+                    fontWeight: status === "error" ? "bold" : "normal"
+                }}>
+                    {getStatusMessage()}
+                </p>
+            </div>
 
-            {/* Action Button */}
-            <button
-                onClick={buttonConfig.onClick}
-                disabled={buttonConfig.disabled}
-                style={{
-                    marginTop: "12px",
-                    padding: "8px 16px",
-                    border: "none",
-                    borderRadius: "6px",
-                    background: buttonConfig.bgColor,
-                    color: "white",
-                    cursor: buttonConfig.disabled ? "not-allowed" : "pointer",
-                    opacity: buttonConfig.disabled ? 0.6 : 1
-                }}
-            >
-                {buttonConfig.text}
-            </button>
+            {/* Action Buttons */}
+            <div style={{ display: "flex", gap: "10px" }}>
+                {status === "ready" && (
+                    <button
+                        onClick={handleDownload}
+                        disabled={isProcessing}
+                        style={{
+                            flex: 1,
+                            padding: "12px 20px",
+                            backgroundColor: "#007bff",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontSize: "16px",
+                            fontWeight: "bold",
+                            opacity: isProcessing ? 0.6 : 1
+                        }}
+                    >
+                        📥 Download File
+                    </button>
+                )}
 
-            {/* File Info */}
-            {fileId && status === "ready" && (
-                <div style={{ marginTop: "10px", padding: "10px", background: "#f5f5f5", borderRadius: "6px" }}>
-                    <p style={{ fontSize: "12px", color: "#666", margin: 0 }}>
-                        File ID: {fileId}
-                    </p>
-                </div>
-            )}
+                {(currentFile || fileId) && (
+                    <button
+                        onClick={handleClear}
+                        disabled={isProcessing}
+                        style={{
+                            padding: "12px 20px",
+                            backgroundColor: "#6c757d",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontSize: "16px",
+                            opacity: isProcessing ? 0.6 : 1
+                        }}
+                    >
+                        🗑️ Clear
+                    </button>
+                )}
+            </div>
 
-            {/* Debug Info */}
-            <div style={{ marginTop: "15px", padding: "10px", background: "#f0f8ff", borderRadius: "6px", border: "1px solid #d1e7ff" }}>
-                <p style={{ fontSize: "12px", color: "#1976d2", margin: "0 0 5px 0", fontWeight: "bold" }}>
-                    Debug Information:
-                </p>
-                <p style={{ fontSize: "11px", color: "#555", margin: "2px 0" }}>
-                    Status: <strong>{status}</strong>
-                </p>
-                <p style={{ fontSize: "11px", color: "#555", margin: "2px 0" }}>
-                    File ID: <strong>{fileId || "None"}</strong>
-                </p>
-                <p style={{ fontSize: "11px", color: "#555", margin: "2px 0" }}>
-                    Platform: <strong>{isAndroid ? "Android" : "Non-Android"}</strong>
-                </p>
+            {/* Platform Info */}
+            <div style={{
+                marginTop: "20px",
+                padding: "10px",
+                backgroundColor: "#fff3cd",
+                border: "1px solid #ffeaa7",
+                borderRadius: "6px",
+                fontSize: "12px",
+                color: "#856404"
+            }}>
+                <strong>Platform:</strong> {/iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iOS' : 'Other'}
+                <br />
+                <strong>Chunk Size:</strong> 256KB
+                <br />
+                <strong>Optimized for:</strong> Large files (up to 10GB)
             </div>
         </div>
     );

@@ -14,7 +14,8 @@ import FileChunkTest from "./components/FileChunkTest";
 import FileSenderTest from "./components/FileSenderTest"; // ✅ test component
 
 import {deleteDatabase} from "./utils/chunkUtil";
-import FileChunkReader from "./components/FileChunkReader"; // import your delete function
+import FileChunkReader from "./components/FileChunkReader";
+import AndroidChunkSpeedTest from "./components/AndroidChunkSpeedTest"; // import your delete function
 
 // ✅ Delete DB immediately at app start
 deleteDatabase()
@@ -77,7 +78,8 @@ function App() {
                             <Route path="/send" element={<SendFiles />} />
                             <Route path="/receive" element={<ReceiveFiles />} />
                             <Route path="/test-chunk0" element={<FileSenderTest />} /> {/* ✅ new test route */}
-                            <Route path="/test-chunk" element={<FileChunkReader />} /> {/* ✅ new test route */}
+                            <Route path="/test-chunk1" element={<FileChunkReader />} /> {/* ✅ new test route */}
+                            <Route path="/test-chunk" element={<AndroidChunkSpeedTest />} /> {/* ✅ new test route */}
                             <Route path="*" element={<PeerConnect />} />
                         </Routes>
 

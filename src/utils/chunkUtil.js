@@ -6,7 +6,6 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 let dbInstance = null;
 const memoryChunks = {}; // { fileId: { chunks: [], size: 0 } }
-const CHUNK_SIZE = 256 * 1024;
 const CHUNK_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // Delete DB
@@ -111,45 +110,26 @@ export const saveChunk = async (fileId, chunk) => {
     memoryChunks[fileId].size += chunk.size;
 
     if (memoryChunks[fileId].size >= CHUNK_THRESHOLD) {
-        // await flush(fileId);
-        await flushTest(fileId);
+        await flush(fileId);
     }
 };
-export const flushTest = async (fileId) => {
-    const buffer = memoryChunks[fileId];
-    if (!buffer || buffer.chunks.length === 0) return;
 
-    const chunks = buffer.chunks;
-    memoryChunks[fileId] = { chunks: [], size: 0 };
+// Convert list of Blobs to a single ArrayBuffer (Android-optimized)
+export const toArrayBuffer = async (chunks) => {
+    const buffers = await Promise.all(chunks.map(chunk => chunk.arrayBuffer()));
+    const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
 
-    // Calculate total size
-    let totalSize = 0;
-    for (const chunk of chunks) {
-        totalSize += chunk.size ?? chunk.byteLength ?? chunk.length;
-    }
-
-    // Allocate single Uint8Array
-    const combinedArray = new Uint8Array(totalSize);
+    const combined = new Uint8Array(totalLength);
     let offset = 0;
 
-    for (const chunk of chunks) {
-        let arrayBuffer;
-        if (chunk instanceof ArrayBuffer) {
-            arrayBuffer = chunk;
-        } else if (chunk instanceof Uint8Array) {
-            arrayBuffer = chunk.buffer;
-        } else {
-            // If it's a Blob or File slice
-            arrayBuffer = await chunk.arrayBuffer();
-        }
-
-        const chunkArray = new Uint8Array(arrayBuffer);
-        combinedArray.set(chunkArray, offset);
-        offset += chunkArray.byteLength;
+    for (const buf of buffers) {
+        combined.set(new Uint8Array(buf), offset);
+        offset += buf.byteLength;
     }
 
-    console.log('dataToStore', combinedArray.byteLength);
+    return combined.buffer;
 };
+
 
 // Flush chunks to DB
 export const flush = async (fileId) => {
@@ -160,8 +140,14 @@ export const flush = async (fileId) => {
     const chunks = buffer.chunks;
     memoryChunks[fileId] = { chunks: [], size: 0 };
 
-    const combinedBlob = new Blob(chunks);
-    const dataToStore = await combinedBlob.arrayBuffer();
+
+    let dataToStore;
+    if (/Android/i.test(navigator.userAgent)) {
+        dataToStore = await toArrayBuffer(chunks); // Android-optimized
+    } else {
+        const combinedBlob = new Blob(chunks);
+        dataToStore = await combinedBlob.arrayBuffer();
+    }
 
     const db = await openDB();
     const tx = db.transaction([CHUNK_STORE], "readwrite");

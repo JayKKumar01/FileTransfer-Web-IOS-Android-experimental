@@ -19,15 +19,8 @@ const useLogger = () => {
     };
 };
 
-const chunkOptions = [
-    { label: "64 KB", value: 64 * 1024 },
-    { label: "128 KB", value: 128 * 1024 },
-    { label: "256 KB", value: 256 * 1024 },
-    { label: "512 KB", value: 512 * 1024 },
-    { label: "1 MB", value: 1024 * 1024 },
-    { label: "2 MB", value: 2 * 1024 * 1024 },
-    { label: "4 MB", value: 4 * 1024 * 1024 },
-];
+const CHUNK_SIZE = 256 * 1024; // 256 KB
+
 
 
 const FileSender = () => {
@@ -37,7 +30,6 @@ const FileSender = () => {
     const [fileId, setFileId] = useState(null);
     const [fileName, setFileName] = useState(null);
     const [fileSize, setFileSize] = useState(0);
-    const [sendChunkSize, setSendChunkSize] = useState(256 * 1024);
 
     const log = useLogger();
 
@@ -57,28 +49,11 @@ const FileSender = () => {
             let offset = 0;
             let lastPercent = 0;
 
-            const readChunk = (blobSlice) => {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-
-                    reader.onload = async (event) => {
-                        const chunkData = event.target.result;
-                        resolve(chunkData);
-                    };
-
-                    reader.onerror = (error) => reject(error);
-
-                    reader.readAsArrayBuffer(blobSlice);
-                });
-            };
-
             while (offset < file.size) {
-                const slice = file.slice(offset, offset + sendChunkSize);
-                const chunkData = await readChunk(slice);
+                const slice = file.slice(offset, offset + CHUNK_SIZE);
+                await saveChunk(newFileId, slice);
 
-                // await saveChunk(newFileId, chunkData);
-
-                offset += chunkData.byteLength; // update offset
+                offset += CHUNK_SIZE; // update offset
 
                 // Update progress only if it changed
                 const percent = Math.floor((offset / file.size) * 100);
@@ -162,18 +137,6 @@ const FileSender = () => {
                 onChange={handleFileSelect}
                 style={{ marginBottom: "12px", padding: "6px", border: "1px solid #ccc", borderRadius: "6px" }}
             />
-
-            <select
-                value={sendChunkSize}
-                onChange={(e) => setSendChunkSize(Number(e.target.value))}
-                style={{ marginBottom: "12px", padding: "6px", border: "1px solid #ccc", borderRadius: "6px" }}
-            >
-                {chunkOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                    </option>
-                ))}
-            </select>
 
             {fileSize > 0 && (
                 <p style={{ fontSize: "14px", color: "#666", marginBottom: "10px" }}>

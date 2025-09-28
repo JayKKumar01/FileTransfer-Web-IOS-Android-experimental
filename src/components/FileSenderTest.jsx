@@ -20,6 +20,10 @@ const useLogger = () => {
 };
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
+const getOptimalBatch = (fileSizeMB) => (fileSizeMB >= 8 ? 8 : fileSizeMB);
+const ANDROID_REGEX = /Android/i;
+const isAndroid = ANDROID_REGEX.test(navigator.userAgent);
+
 
 
 
@@ -32,6 +36,27 @@ const FileSender = () => {
     const [fileSize, setFileSize] = useState(0);
 
     const log = useLogger();
+
+    const processBuffer = async (buffer, fileSize, offsetStart = 0, newFileId) => {
+        let offset = offsetStart;
+        let lastPercent = Math.floor((offset / fileSize) * 100);
+
+        for (let i = 0; i < buffer.byteLength; i += CHUNK_SIZE) {
+            const end = Math.min(i + CHUNK_SIZE, buffer.byteLength);
+            const chunk = buffer.slice(i, end);
+            await saveChunk(newFileId, chunk);
+            offset += chunk.byteLength;
+
+            const percent = Math.floor((offset / fileSize) * 100);
+            if (percent !== lastPercent) {
+                lastPercent = percent;
+                setSendProgress(percent);
+                log(`Read ${chunk.byteLength} bytes, Progress: ${percent}%`);
+            }
+        }
+
+        return offset;
+    };
 
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
@@ -47,23 +72,31 @@ const FileSender = () => {
             await createStore(newFileId, file.name);
 
             let offset = 0;
-            let lastPercent = 0;
 
-            while (offset < file.size) {
-                const slice = file.slice(offset, offset + CHUNK_SIZE);
-                await saveChunk(newFileId, slice);
+            if (isAndroid) {
+                const fileSizeMB = file.size / (1024 * 1024);
+                const batchSizeMB = getOptimalBatch(fileSizeMB);
+                const batchBytes = Math.min(batchSizeMB * 1024 * 1024, file.size);
+                log(`Using Android batch reading (${batchSizeMB} MB batches)`);
+                while (offset < file.size) {
+                    const slice = file.slice(offset, Math.min(offset + batchBytes, file.size));
+                    const buffer = await slice.arrayBuffer();
+                    offset = await processBuffer(buffer, file.size, offset, newFileId);
 
-                offset += CHUNK_SIZE; // update offset
-
-                // Update progress only if it changed
-                const percent = Math.floor((offset / file.size) * 100);
-                if (percent !== lastPercent) {
-                    lastPercent = percent;
-                    setSendProgress(percent);
+                    // Yield for UI
+                    await new Promise((r) => setTimeout(r, 0));
+                }
+            } else {
+                log("Using sequential reading (256 KB chunks)");
+                while (offset < file.size) {
+                    const slice = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
+                    const buffer = await slice.arrayBuffer();
+                    offset = await processBuffer(buffer, file.size, offset, newFileId);
                 }
             }
 
             await flush(newFileId);
+            setSendProgress(100);
 
             setStatus("completed");
             log(`✅ File sent → fileId: ${newFileId}, size: ${file.size} bytes`);

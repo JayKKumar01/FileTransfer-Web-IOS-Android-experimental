@@ -107,7 +107,7 @@ export const createStore = async (fileId, fileName) => {
 // Save chunk
 export const saveChunk = async (fileId, chunk) => {
     memoryChunks[fileId].chunks.push(chunk);
-    memoryChunks[fileId].size += chunk.size;
+    memoryChunks[fileId].size += chunk.byteLength;
 
     if (memoryChunks[fileId].size >= CHUNK_THRESHOLD) {
         await flush(fileId);
@@ -140,14 +140,8 @@ export const flush = async (fileId) => {
     const chunks = buffer.chunks;
     memoryChunks[fileId] = { chunks: [], size: 0 };
 
-
-    let dataToStore;
-    if (/Android/i.test(navigator.userAgent)) {
-        dataToStore = await toArrayBuffer(chunks); // Android-optimized
-    } else {
-        const combinedBlob = new Blob(chunks);
-        dataToStore = await combinedBlob.arrayBuffer();
-    }
+    const combinedBlob = new Blob(chunks);
+    const dataToStore = await combinedBlob.arrayBuffer();
 
     const db = await openDB();
     const tx = db.transaction([CHUNK_STORE], "readwrite");

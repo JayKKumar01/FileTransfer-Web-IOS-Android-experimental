@@ -122,15 +122,19 @@ export const flush = async (fileId) => {
     const chunks = buffer.chunks;
     const totalSize = buffer.size;
 
-    // Clear memory immediately
     memoryChunks[fileId] = { chunks: [], size: 0 };
 
-    // Combine ArrayBuffers directly
     const combinedBuffer = new Uint8Array(totalSize);
     let offset = 0;
-    for (const chunk of chunks) {
-        combinedBuffer.set(new Uint8Array(chunk), offset);
-        offset += chunk.byteLength;
+    const yieldInterval = Math.max(1, Math.floor(chunks.length / 8)); // ~8 yields per flush
+
+    for (let i = 0; i < chunks.length; i++) {
+        combinedBuffer.set(new Uint8Array(chunks[i]), offset);
+        offset += chunks[i].byteLength;
+
+        if (i % yieldInterval === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        }
     }
 
     const db = await openDB();

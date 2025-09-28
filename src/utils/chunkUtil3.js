@@ -6,7 +6,7 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 let dbInstance = null;
 const memoryChunks = {}; // { fileId: { chunks: [], size: 0 } }
-const CHUNK_THRESHOLD = isIOS ? 4 * 1024 * 1024 : 8 * 1024 * 1024;
+const CHUNK_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // Delete DB
 export const deleteDatabase = () =>

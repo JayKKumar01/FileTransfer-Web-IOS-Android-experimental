@@ -6,7 +6,7 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 let dbInstance = null;
 const memoryChunks = {}; // { fileId: { chunks: [], size: 0 } }
-const CHUNK_THRESHOLD = isIOS ? 4 * 1024 * 1024 : 8 * 1024 * 1024;
+const CHUNK_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // Delete DB
 export const deleteDatabase = () =>
@@ -120,29 +120,15 @@ export const flush = async (fileId) => {
     if (!buffer || buffer.chunks.length === 0) return;
 
     const chunks = buffer.chunks;
-    const totalSize = buffer.size;
 
     memoryChunks[fileId] = { chunks: [], size: 0 };
-
-    const combinedBuffer = new Uint8Array(totalSize);
-    let offset = 0;
-    const yieldInterval = Math.max(1, Math.floor(chunks.length / 8)); // ~8 yields per flush
-
-    for (let i = 0; i < chunks.length; i++) {
-        combinedBuffer.set(new Uint8Array(chunks[i]), offset);
-        offset += chunks[i].byteLength;
-
-        if (i % yieldInterval === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-        }
-    }
 
     const db = await openDB();
     const tx = db.transaction([CHUNK_STORE], "readwrite");
     const store = tx.objectStore(CHUNK_STORE);
 
     // Store directly as ArrayBuffer
-    store.add({ fileId, data: combinedBuffer.buffer });
+    store.add({ fileId, data: chunks });
 
     await new Promise((resolve, reject) => {
         tx.oncomplete = () => resolve();
@@ -202,8 +188,10 @@ export const getBlob = async (fileId, type = "application/octet-stream", onProgr
         request.onsuccess = (event) => {
             const cursor = event.target.result;
             if (cursor) {
-                const data = cursor.value.data;
-                blobParts.push(new Blob([data], { type }));
+                const chunks = cursor.value.data;
+                for (let data of chunks){
+                    blobParts.push(new Blob([data], { type }));
+                }
                 processed++;
                 cursor.delete();
                 if (onProgress) onProgress(processed, totalChunks);

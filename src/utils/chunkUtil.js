@@ -8,7 +8,7 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 let dbInstance = null;
 const memoryChunks = {}; // { fileId: { chunks: [], size: 0 } }
-const CHUNK_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
+const CHUNK_THRESHOLD = isIOS ? 4 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // --------------------- DATABASE UTILITIES --------------------- //
 
@@ -106,8 +106,15 @@ export const flush = async (fileId) => {
     const buffer = memoryChunks[fileId];
     if (!buffer || buffer.chunks.length === 0) return;
 
-    const chunks = buffer.chunks;
+    let chunks = buffer.chunks;
     memoryChunks[fileId] = { chunks: [], size: 0 };
+
+    if (isIOS) {
+        // Combine all chunks into one Blob and then convert to ArrayBuffer
+        const blob = new Blob(chunks, { type: "application/octet-stream" });
+        const arrayBuffer = await blob.arrayBuffer();
+        chunks = [arrayBuffer]; // store as single chunk
+    }
 
     const db = await openDB();
     const tx = db.transaction([CHUNK_STORE], "readwrite");
@@ -121,6 +128,7 @@ export const flush = async (fileId) => {
         tx.onabort = () => reject(tx.error);
     });
 };
+
 
 // Set file name
 export const setName = async (fileId, name) => {
@@ -194,6 +202,49 @@ export const downloadFile = async (fileId, onProgress) => {
     });
 
     await readableStream.pipeTo(streamSaver.createWriteStream(fileName));
+};
+
+// Get final Blob progressively, deleting chunks immediately
+export const getBlob = async (fileId, type = "application/octet-stream", onProgress) => {
+    await flush(fileId);
+
+    const db = await openDB();
+    const blobParts = [];
+    let processed = 0;
+
+    // Count total chunks first
+    const totalChunks = await new Promise((resolve, reject) => {
+        const tx = db.transaction([CHUNK_STORE], "readonly");
+        const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+        const req = store.count(IDBKeyRange.only(fileId));
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([CHUNK_STORE], "readwrite");
+        const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+        const request = store.openCursor(IDBKeyRange.only(fileId));
+
+        request.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+                const chunks = cursor.value.data;
+                for (let data of chunks){
+                    blobParts.push(new Blob([data], { type }));
+                }
+                processed++;
+                cursor.delete();
+                if (onProgress) onProgress(processed, totalChunks);
+
+                cursor.continue();
+            } else {
+                resolve(new Blob(blobParts, { type }));
+            }
+        };
+
+        request.onerror = () => reject(request.error);
+    });
 };
 
 // --------------------- IOS STORAGE REFRESH --------------------- //

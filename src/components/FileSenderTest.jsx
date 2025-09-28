@@ -8,7 +8,7 @@ import {
     clearChunks,
     getName,
     flush,
-    getInfo, refreshIOSStorage, downloadFile
+    getInfo, refreshIOSStorage
 } from "../utils/chunkUtil";
 
 const useLogger = () => {
@@ -115,15 +115,32 @@ const FileSender = () => {
         setStatus("assembling");
 
         try {
-            // Start streaming download
-            await downloadFile(fileId, (processed, total) => {
+            const name = await getName(fileId);
+            const assembledBlob = await getBlob(fileId, "application/octet-stream", (processed, total) => {
                 const percent = Math.floor((processed / total) * 100);
                 setAssembleProgress(percent);
             });
 
-            log(`⬇️ Download completed: ${fileId}`);
+            let url = URL.createObjectURL(assembledBlob);
+            let a = document.createElement("a");
+            a.href = url;
+            a.download = name;
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
+            // Force garbage collection by revoking URL and removing element
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
 
-            // Reset state
+                // Nullify references to help garbage collection
+                a = null;
+                url = null;
+            }, 100);
+
+            log(`⬇️ Downloaded: ${name}, size: ${assembledBlob.size}`);
+
+            // reset state
             setFileId(null);
             setFileName(null);
             setFileSize(0);
@@ -131,18 +148,20 @@ const FileSender = () => {
             setAssembleProgress(0);
             setStatus("idle");
 
-            // Optional: inspect DB after deletion
             const afterInfo = await getInfo(fileId);
-            log("After clear:\n" + JSON.stringify(afterInfo, null, 2));
+            log('After clear:\n' + JSON.stringify(afterInfo, null, 2));
 
             const refreshed = await refreshIOSStorage();
-            if (refreshed) log("iOS storage view refreshed successfully.");
+            if (refreshed) {
+                log("iOS storage view refreshed successfully.");
+            }
+
+
         } catch (err) {
             log(`❌ Error downloading file: ${err.message}`);
             setStatus("error");
         }
     };
-
 
     return (
         <div style={{ padding: "16px", fontFamily: "Arial" }}>

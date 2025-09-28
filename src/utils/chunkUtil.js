@@ -111,23 +111,45 @@ export const saveChunk = async (fileId, chunk) => {
     memoryChunks[fileId].size += chunk.size;
 
     if (memoryChunks[fileId].size >= CHUNK_THRESHOLD) {
-        await flush(fileId);
-        // await flushTest(fileId);
+        // await flush(fileId);
+        await flushTest(fileId);
     }
 };
-
 export const flushTest = async (fileId) => {
     const buffer = memoryChunks[fileId];
     if (!buffer || buffer.chunks.length === 0) return;
 
-    // Release memory chunks immediately
     const chunks = buffer.chunks;
-    memoryChunks[fileId] = {chunks: [], size: 0};
+    memoryChunks[fileId] = { chunks: [], size: 0 };
 
-    const combinedBlob = new Blob(chunks);
-    const dataToStore = await combinedBlob.arrayBuffer();
-    console.log('dataToStore', dataToStore.byteLength);
-}
+    // Calculate total size
+    let totalSize = 0;
+    for (const chunk of chunks) {
+        totalSize += chunk.size ?? chunk.byteLength ?? chunk.length;
+    }
+
+    // Allocate single Uint8Array
+    const combinedArray = new Uint8Array(totalSize);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        let arrayBuffer;
+        if (chunk instanceof ArrayBuffer) {
+            arrayBuffer = chunk;
+        } else if (chunk instanceof Uint8Array) {
+            arrayBuffer = chunk.buffer;
+        } else {
+            // If it's a Blob or File slice
+            arrayBuffer = await chunk.arrayBuffer();
+        }
+
+        const chunkArray = new Uint8Array(arrayBuffer);
+        combinedArray.set(chunkArray, offset);
+        offset += chunkArray.byteLength;
+    }
+
+    console.log('dataToStore', combinedArray.byteLength);
+};
 
 // Flush chunks to DB
 export const flush = async (fileId) => {

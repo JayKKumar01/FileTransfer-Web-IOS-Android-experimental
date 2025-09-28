@@ -29,14 +29,6 @@ const chunkOptions = [
     { label: "4 MB", value: 4 * 1024 * 1024 },
 ];
 
-// --- File chunk generator ---
-async function* chunkFile(file, size) {
-    let offset = 0;
-    while (offset < file.size) {
-        yield file.slice(offset, offset + size);
-        offset += size;
-    }
-}
 
 const FileSender = () => {
     const [sendProgress, setSendProgress] = useState(0);
@@ -62,15 +54,34 @@ const FileSender = () => {
         try {
             await createStore(newFileId, file.name);
 
-            let processed = 0;
+            let offset = 0;
             let lastPercent = 0;
 
-            for await (const slice of chunkFile(file, sendChunkSize)) {
-                await saveChunk(newFileId, slice);
-                processed += slice.size;
+            const readChunk = (blobSlice) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
 
-                // update progress only when percent actually changes
-                const percent = Math.floor((processed / file.size) * 100);
+                    reader.onload = async (event) => {
+                        const chunkData = event.target.result;
+                        resolve(chunkData);
+                    };
+
+                    reader.onerror = (error) => reject(error);
+
+                    reader.readAsArrayBuffer(blobSlice);
+                });
+            };
+
+            while (offset < file.size) {
+                const slice = file.slice(offset, offset + sendChunkSize);
+                const chunkData = await readChunk(slice);
+
+                // await saveChunk(newFileId, chunkData);
+
+                offset += chunkData.byteLength; // update offset
+
+                // Update progress only if it changed
+                const percent = Math.floor((offset / file.size) * 100);
                 if (percent !== lastPercent) {
                     lastPercent = percent;
                     setSendProgress(percent);
@@ -86,6 +97,8 @@ const FileSender = () => {
             setStatus("error");
         }
     };
+
+
 
     const handleDownload = async () => {
         if (!fileId) return alert("No file available");

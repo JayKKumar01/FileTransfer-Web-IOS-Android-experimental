@@ -97,7 +97,6 @@ export const createStore = async (fileId, fileName) => {
 };
 
 export const saveChunk = async (fileId, chunk) => {
-    if (!memoryChunks[fileId]) memoryChunks[fileId] = { chunks: [], size: 0 };
     memoryChunks[fileId].chunks.push(chunk);
     memoryChunks[fileId].size += chunk.byteLength;
 
@@ -155,7 +154,7 @@ export const downloadFile = async (fileId, onProgress) => {
     const fileName = await getName(fileId);
     const db = await openDB();
 
-    // count total records
+    // Count total records for progress
     const totalRecords = await new Promise((resolve, reject) => {
         const tx = db.transaction([CHUNK_STORE], "readonly");
         const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
@@ -164,78 +163,63 @@ export const downloadFile = async (fileId, onProgress) => {
         req.onerror = () => reject(req.error);
     });
 
-    console.log("[Download] Total records for file:", totalRecords);
+    console.log("[Download] Total records:", totalRecords);
 
     let processedRecords = 0;
     let currentChunks = [];
     let currentChunkPtr = 0;
     let cursorKey = null;
 
-    // Helper → load next record fresh each time
-    const loadNextRecord = async () => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([CHUNK_STORE], "readonly");
-            const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
-            const req = cursorKey
-                ? store.openCursor(IDBKeyRange.lowerBound(cursorKey, true))
-                : store.openCursor(IDBKeyRange.only(fileId));
-
-            req.onsuccess = (e) => {
-                const c = e.target.result;
-                if (!c) return resolve(null);
-                cursorKey = c.primaryKey;
-                resolve(c.value.data || []);
-            };
-            req.onerror = () => reject(req.error);
-        });
-    };
-
-    // Helper → delete a record after processing
-    const deleteRecord = async (key) => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([CHUNK_STORE], "readwrite");
-            const store = tx.objectStore(CHUNK_STORE);
-            const req = store.delete(key);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-        });
-    };
-
     const readableStream = new ReadableStream({
         async pull(controller) {
-            // load new record if finished current
+            // Load next record if all chunks of current record are done
             if (currentChunkPtr >= currentChunks.length) {
                 if (cursorKey !== null) {
-                    await deleteRecord(cursorKey); // clean up after last record
+                    // Delete last processed record in a short transaction
+                    await new Promise((resolve, reject) => {
+                        const tx = db.transaction([CHUNK_STORE], "readwrite");
+                        const store = tx.objectStore(CHUNK_STORE);
+                        const req = store.delete(cursorKey);
+                        req.onsuccess = () => {
+                            processedRecords++; // increment AFTER deletion
+                            if (onProgress) onProgress(processedRecords, totalRecords);
+                            console.log(`[Delete] Record deleted: key=${cursorKey} (${processedRecords}/${totalRecords})`);
+                            resolve();
+                        };
+                        req.onerror = () => reject(req.error);
+                    });
                 }
 
-                currentChunks = await loadNextRecord();
-                currentChunkPtr = 0;
+                // Open a fresh transaction to load next record
+                const nextRecord = await new Promise((resolve, reject) => {
+                    const tx = db.transaction([CHUNK_STORE], "readonly");
+                    const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+                    const range = cursorKey ? IDBKeyRange.lowerBound(cursorKey, true) : IDBKeyRange.only(fileId);
+                    const req = store.openCursor(range);
+                    req.onsuccess = (e) => resolve(e.target.result);
+                    req.onerror = (e) => reject(e.target.error);
+                });
 
-                if (!currentChunks || currentChunks.length === 0) {
+                if (!nextRecord) {
                     console.log("[Download] All records processed. Closing stream.");
                     controller.close();
                     return;
                 }
 
-                processedRecords++;
-                if (onProgress) onProgress(processedRecords, totalRecords);
+                // Setup for streaming chunks from this record
+                cursorKey = nextRecord.primaryKey;
+                currentChunks = nextRecord.value.data;
+                currentChunkPtr = 0;
 
-                console.log(
-                    `[Record] Loaded record ${processedRecords}/${totalRecords}, chunks=${currentChunks.length}`
-                );
+                console.log(`[Record] Loaded record chunks=${currentChunks.length}, cursorKey=${cursorKey}`);
             }
 
-            // stream next chunk
+            // Enqueue next chunk
             const buf = currentChunks[currentChunkPtr++];
             controller.enqueue(new Uint8Array(buf));
+            currentChunks[currentChunkPtr - 1] = null; // free memory
 
-            console.log(
-                `[Enqueue] rec=${processedRecords}/${totalRecords} chunkIdx=${currentChunkPtr} size=${buf.byteLength}`
-            );
-
-            // free memory
-            currentChunks[currentChunkPtr - 1] = null;
+            console.log(`[Enqueue] chunkIdx=${currentChunkPtr} size=${buf.byteLength}`);
         },
     });
 

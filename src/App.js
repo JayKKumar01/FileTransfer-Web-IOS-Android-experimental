@@ -78,8 +78,7 @@ function App() {
                             <Route path="/send" element={<SendFiles />} />
                             <Route path="/receive" element={<ReceiveFiles />} />
                             <Route path="/test-chunk0" element={<FileSenderTest />} /> {/* ✅ new test route */}
-                            <Route path="/test-chunk1" element={<FileChunkReader />} /> {/* ✅ new test route */}
-                            <Route path="/test-chunk" element={<AndroidChunkSpeedTest />} /> {/* ✅ new test route */}
+                            <Route path="/test-chunk" element={<FileChunkReader />} /> {/* ✅ new test route */}
                             <Route path="*" element={<PeerConnect />} />
                         </Routes>
 

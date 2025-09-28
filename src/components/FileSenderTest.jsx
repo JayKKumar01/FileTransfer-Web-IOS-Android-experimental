@@ -1,14 +1,11 @@
 import React, { useState, useContext } from "react";
 import { LogContext } from "../contexts/LogContext";
 import {
-    deleteDatabase,
     createStore,
     saveChunk,
-    getBlob,
-    clearChunks,
     getName,
     flush,
-    getInfo, refreshIOSStorage
+    getInfo, downloadFile
 } from "../utils/chunkUtil";
 
 const useLogger = () => {
@@ -106,41 +103,25 @@ const FileSender = () => {
         }
     };
 
-
-
     const handleDownload = async () => {
         if (!fileId) return alert("No file available");
 
         setAssembleProgress(0);
-        setStatus("assembling");
+        setStatus("downloading");
 
         try {
             const name = await getName(fileId);
-            const assembledBlob = await getBlob(fileId, "application/octet-stream", (processed, total) => {
+
+            // Use new streaming method
+            await downloadFile(fileId, (processed, total) => {
                 const percent = Math.floor((processed / total) * 100);
                 setAssembleProgress(percent);
+                log(`📦 Progress: ${percent}% (${processed}/${total})`);
             });
 
-            let url = URL.createObjectURL(assembledBlob);
-            let a = document.createElement("a");
-            a.href = url;
-            a.download = name;
-            a.style.display = "none";
-            document.body.appendChild(a);
-            a.click();
-            // Force garbage collection by revoking URL and removing element
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            log(`⬇️ Streaming download finished: ${name}`);
 
-                // Nullify references to help garbage collection
-                a = null;
-                url = null;
-            }, 100);
-
-            log(`⬇️ Downloaded: ${name}, size: ${assembledBlob.size}`);
-
-            // reset state
+            // Reset state
             setFileId(null);
             setFileName(null);
             setFileSize(0);
@@ -149,19 +130,13 @@ const FileSender = () => {
             setStatus("idle");
 
             const afterInfo = await getInfo(fileId);
-            log('After clear:\n' + JSON.stringify(afterInfo, null, 2));
-
-            const refreshed = await refreshIOSStorage();
-            if (refreshed) {
-                log("iOS storage view refreshed successfully.");
-            }
-
-
+            log("After clear:\n" + JSON.stringify(afterInfo, null, 2));
         } catch (err) {
             log(`❌ Error downloading file: ${err.message}`);
             setStatus("error");
         }
     };
+
 
     return (
         <div style={{ padding: "16px", fontFamily: "Arial" }}>

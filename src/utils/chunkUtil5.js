@@ -1,4 +1,3 @@
-/* chunkUtil.js */
 import streamSaver from "streamsaver";
 
 const DB_NAME = "JayKKumar01-FileTransferDB";
@@ -13,6 +12,7 @@ const CHUNK_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // --------------------- DATABASE UTILITIES --------------------- //
 
+// Delete DB
 export const deleteDatabase = () =>
     new Promise((resolve, reject) => {
         if (dbInstance) {
@@ -25,6 +25,7 @@ export const deleteDatabase = () =>
         deleteRequest.onblocked = () => console.warn("Database deletion blocked.");
     });
 
+// Open DB
 const openDB = () =>
     new Promise((resolve, reject) => {
         if (dbInstance) return resolve(dbInstance);
@@ -68,12 +69,7 @@ export const getInfo = async (fileId) => {
             const cursor = event.target.result;
             if (cursor) {
                 dbCount++;
-                // cursor.value.data is array of ArrayBuffers: sum sizes
-                if (Array.isArray(cursor.value.data)) {
-                    for (const ab of cursor.value.data) {
-                        if (ab && ab.byteLength) dbSize += ab.byteLength;
-                    }
-                }
+                if (cursor.value.data && cursor.value.data.byteLength) dbSize += cursor.value.data.byteLength;
                 cursor.continue();
             } else {
                 resolve({
@@ -91,19 +87,21 @@ export const getInfo = async (fileId) => {
 
 // --------------------- CHUNK MANAGEMENT --------------------- //
 
+// Create store
 export const createStore = async (fileId, fileName) => {
     await setName(fileId, fileName);
     memoryChunks[fileId] = { chunks: [], size: 0 };
 };
 
+// Save chunk in memory and flush if threshold reached
 export const saveChunk = async (fileId, chunk) => {
-    if (!memoryChunks[fileId]) memoryChunks[fileId] = { chunks: [], size: 0 };
     memoryChunks[fileId].chunks.push(chunk);
     memoryChunks[fileId].size += chunk.byteLength;
 
     if (memoryChunks[fileId].size >= CHUNK_THRESHOLD) await flush(fileId);
 };
 
+// Flush chunks to IndexedDB
 export const flush = async (fileId) => {
     const buffer = memoryChunks[fileId];
     if (!buffer || buffer.chunks.length === 0) return;
@@ -111,11 +109,17 @@ export const flush = async (fileId) => {
     let chunks = buffer.chunks;
     memoryChunks[fileId] = { chunks: [], size: 0 };
 
-    // If you want special ios behaviour (pack chunks into fewer records), handle here
-    // For simplicity we store the array of ArrayBuffers as-is:
+    if (isIOS) {
+        // Combine all chunks into one Blob and then convert to ArrayBuffer
+        const blob = new Blob(chunks, { type: "application/octet-stream" });
+        const arrayBuffer = await blob.arrayBuffer();
+        chunks = [arrayBuffer]; // store as single chunk
+    }
+
     const db = await openDB();
     const tx = db.transaction([CHUNK_STORE], "readwrite");
     const store = tx.objectStore(CHUNK_STORE);
+
     store.add({ fileId, data: chunks });
 
     await new Promise((resolve, reject) => {
@@ -125,7 +129,8 @@ export const flush = async (fileId) => {
     });
 };
 
-// Set / get name
+
+// Set file name
 export const setName = async (fileId, name) => {
     const db = await openDB();
     const tx = db.transaction([META_STORE], "readwrite");
@@ -138,6 +143,7 @@ export const setName = async (fileId, name) => {
     });
 };
 
+// Get file name
 export const getName = async (fileId) => {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -149,14 +155,15 @@ export const getName = async (fileId) => {
     });
 };
 
-// --------------------- STREAMING DOWNLOAD (robust) --------------------- //
+// --------------------- STREAMING DOWNLOAD --------------------- //
 
 export const downloadFile = async (fileId, onProgress) => {
+    await flush(fileId);
     const fileName = await getName(fileId);
     const db = await openDB();
 
-    // count total records
-    const totalRecords = await new Promise((resolve, reject) => {
+    // Count total chunks
+    const totalChunks = await new Promise((resolve, reject) => {
         const tx = db.transaction([CHUNK_STORE], "readonly");
         const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
         const req = store.count(IDBKeyRange.only(fileId));
@@ -164,83 +171,95 @@ export const downloadFile = async (fileId, onProgress) => {
         req.onerror = () => reject(req.error);
     });
 
-    console.log("[Download] Total records for file:", totalRecords);
+    let processed = 0;
 
-    let processedRecords = 0;
-    let currentChunks = [];
-    let currentChunkPtr = 0;
-    let cursorKey = null;
-
-    // Helper → load next record fresh each time
-    const loadNextRecord = async () => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([CHUNK_STORE], "readonly");
-            const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
-            const req = cursorKey
-                ? store.openCursor(IDBKeyRange.lowerBound(cursorKey, true))
-                : store.openCursor(IDBKeyRange.only(fileId));
-
-            req.onsuccess = (e) => {
-                const c = e.target.result;
-                if (!c) return resolve(null);
-                cursorKey = c.primaryKey;
-                resolve(c.value.data || []);
-            };
-            req.onerror = () => reject(req.error);
-        });
-    };
-
-    // Helper → delete a record after processing
-    const deleteRecord = async (key) => {
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction([CHUNK_STORE], "readwrite");
-            const store = tx.objectStore(CHUNK_STORE);
-            const req = store.delete(key);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-        });
-    };
-
+    // Create a ReadableStream that reads chunks sequentially
     const readableStream = new ReadableStream({
-        async pull(controller) {
-            // load new record if finished current
-            if (currentChunkPtr >= currentChunks.length) {
-                if (cursorKey !== null) {
-                    await deleteRecord(cursorKey); // clean up after last record
-                }
+        start(controller) {
+            const tx = db.transaction([CHUNK_STORE], "readwrite");
+            const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+            const request = store.openCursor(IDBKeyRange.only(fileId));
 
-                currentChunks = await loadNextRecord();
-                currentChunkPtr = 0;
-
-                if (!currentChunks || currentChunks.length === 0) {
-                    console.log("[Download] All records processed. Closing stream.");
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (!cursor) {
                     controller.close();
                     return;
                 }
 
-                processedRecords++;
-                if (onProgress) onProgress(processedRecords, totalRecords);
+                const chunks = cursor.value.data;
+                for (let chunk of chunks) controller.enqueue(new Uint8Array(chunk));
 
-                console.log(
-                    `[Record] Loaded record ${processedRecords}/${totalRecords}, chunks=${currentChunks.length}`
-                );
-            }
+                processed++;
+                if (onProgress) onProgress(processed, totalChunks);
 
-            // stream next chunk
-            const buf = currentChunks[currentChunkPtr++];
-            controller.enqueue(new Uint8Array(buf));
+                cursor.delete(); // delete chunk after reading
+                cursor.continue();
+            };
 
-            console.log(
-                `[Enqueue] rec=${processedRecords}/${totalRecords} chunkIdx=${currentChunkPtr} size=${buf.byteLength}`
-            );
-
-            // free memory
-            currentChunks[currentChunkPtr - 1] = null;
+            request.onerror = (err) => controller.error(err);
         },
     });
 
-    console.log("[Download] Starting streamSaver pipeTo...");
     await readableStream.pipeTo(streamSaver.createWriteStream(fileName));
-    console.log("[Download] File save complete.");
 };
 
+// Get final Blob progressively, deleting chunks immediately
+export const getBlob = async (fileId, type = "application/octet-stream", onProgress) => {
+    await flush(fileId);
+
+    const db = await openDB();
+    const blobParts = [];
+    let processed = 0;
+
+    // Count total chunks first
+    const totalChunks = await new Promise((resolve, reject) => {
+        const tx = db.transaction([CHUNK_STORE], "readonly");
+        const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+        const req = store.count(IDBKeyRange.only(fileId));
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([CHUNK_STORE], "readwrite");
+        const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+        const request = store.openCursor(IDBKeyRange.only(fileId));
+
+        request.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+                const chunks = cursor.value.data;
+                for (let data of chunks){
+                    blobParts.push(new Blob([data], { type }));
+                }
+                processed++;
+                cursor.delete();
+                if (onProgress) onProgress(processed, totalChunks);
+
+                cursor.continue();
+            } else {
+                resolve(new Blob(blobParts, { type }));
+            }
+        };
+
+        request.onerror = () => reject(request.error);
+    });
+};
+
+// --------------------- IOS STORAGE REFRESH --------------------- //
+
+export const refreshIOSStorage = () =>
+    new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME);
+        request.onsuccess = () => {
+            try {
+                const db = request.result;
+                db.close();
+                resolve(true);
+            } catch (err) {
+                reject(err);
+            }
+        };
+        request.onerror = () => reject(request.error);
+    });

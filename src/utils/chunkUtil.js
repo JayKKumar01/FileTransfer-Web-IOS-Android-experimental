@@ -129,7 +129,7 @@ export const flush = async (fileId) => {
     const combinedBuffer = new Uint8Array(totalSize);
     let offset = 0;
     for (const chunk of chunks) {
-        combinedBuffer.set(chunk, offset);
+        combinedBuffer.set(new Uint8Array(chunk), offset);
         offset += chunk.byteLength;
     }
 

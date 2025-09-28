@@ -114,40 +114,31 @@ export const saveChunk = async (fileId, chunk) => {
     }
 };
 
-// Convert list of Blobs to a single ArrayBuffer (Android-optimized)
-export const toArrayBuffer = async (chunks) => {
-    const buffers = await Promise.all(chunks.map(chunk => chunk.arrayBuffer()));
-    const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
-
-    const combined = new Uint8Array(totalLength);
-    let offset = 0;
-
-    for (const buf of buffers) {
-        combined.set(new Uint8Array(buf), offset);
-        offset += buf.byteLength;
-    }
-
-    return combined.buffer;
-};
-
-
-// Flush chunks to DB
+// Flush chunks to DB (optimized)
 export const flush = async (fileId) => {
     const buffer = memoryChunks[fileId];
     if (!buffer || buffer.chunks.length === 0) return;
 
-    // Release memory chunks immediately
     const chunks = buffer.chunks;
+    const totalSize = buffer.size;
+
+    // Clear memory immediately
     memoryChunks[fileId] = { chunks: [], size: 0 };
 
-    const combinedBlob = new Blob(chunks);
-    const dataToStore = await combinedBlob.arrayBuffer();
+    // Combine ArrayBuffers directly
+    const combinedBuffer = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of chunks) {
+        combinedBuffer.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
 
     const db = await openDB();
     const tx = db.transaction([CHUNK_STORE], "readwrite");
     const store = tx.objectStore(CHUNK_STORE);
 
-    store.add({ fileId, data: dataToStore });
+    // Store directly as ArrayBuffer
+    store.add({ fileId, data: combinedBuffer.buffer });
 
     await new Promise((resolve, reject) => {
         tx.oncomplete = () => resolve();
@@ -155,6 +146,7 @@ export const flush = async (fileId) => {
         tx.onabort = () => reject(tx.error);
     });
 };
+
 
 // Set file name
 export const setName = async (fileId, name) => {

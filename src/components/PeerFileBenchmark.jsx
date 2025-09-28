@@ -27,16 +27,13 @@ const PeerFileBenchmark = () => {
         const handler = (msg) => {
             if (msg.type === "blob-test") {
                 connection.send({ type: "ack", id: msg.id, mode: "blob" });
-                // Ensure we have a proper Blob instance
-                const receivedBlob = msg.blob instanceof Blob ? msg.blob : new Blob([msg.blob]);
-                pushLog(`📦 Received Blob #${msg.id} (${receivedBlob.size} bytes)`);
+                pushLog(`📦 Received Blob #${msg.id} (${msg.blob.byteLength} bytes)`);
+
             } else if (msg.type === "ab-test") {
                 connection.send({ type: "ack", id: msg.id, mode: "ab" });
-                const receivedAB = msg.ab instanceof ArrayBuffer ? msg.ab : msg.ab.buffer || msg.ab;
-                pushLog(`📦 Received ArrayBuffer #${msg.id} (${receivedAB.byteLength} bytes)`);
+                pushLog(`📦 Received ArrayBuffer #${msg.id} (${msg.ab.byteLength} bytes)`);
             }
         };
-
 
         connection.on("data", handler);
         return () => connection.off("data", handler);

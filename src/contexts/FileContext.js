@@ -1,5 +1,7 @@
 import React, { createContext, useState } from "react";
 import { useFileMetadata } from "../hooks/useFileMetadata";
+import {useFileSender} from "../hooks/useFileSender";
+import {useFileReceiver} from "../hooks/useFileReceiver";
 
 /**
  * @typedef {import('../interfaces/file').FileItem} FileItem
@@ -67,6 +69,8 @@ export const FileProvider = ({ children }) => {
 
     // -------------------- Metadata Hook --------------------
     useFileMetadata(files, updateFile, addDownloads);
+    useFileSender(files, updateFile);                 // send file chunks
+    useFileReceiver();                                // receive chunks + ack
 
     return (
         <FileContext.Provider

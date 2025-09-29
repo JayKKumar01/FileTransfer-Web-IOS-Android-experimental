@@ -6,7 +6,7 @@ import { formatFileSize } from "../utils/fileUtil";
 const ReceiveFiles = () => {
     const { downloads } = useContext(FileContext);
 
-    if (downloads.length === 0) {
+    if (!downloads.length) {
         return (
             <div className="receive-files-container">
                 <p className="no-files-text">No files received yet.</p>
@@ -18,22 +18,33 @@ const ReceiveFiles = () => {
         <div className="receive-files-container">
             <div className="receive-files-list">
                 <ul>
-                    {downloads.map((file, index) => (
-                        <li className="receive-file-item" key={index}>
+                    {downloads.map((download) => (
+                        <li className="receive-file-item" key={download.id}>
+                            {/* File name row */}
                             <div className="file-row file-name-row">
-                                <span className="file-name">{file.name}</span>
+                                <span className="file-name">{download.metadata.name}</span>
                             </div>
+
+                            {/* File progress row */}
                             <div className="file-row file-progress-row">
                                 <span className="file-progress-text">
-                                    0 KB / {formatFileSize(file.size)}
+                                    {formatFileSize(download.status.progress || 0)} / {formatFileSize(download.metadata.size)}
                                 </span>
-                                <button className="download-button" disabled>
+                                <button
+                                    className="download-button"
+                                    disabled={download.status.state !== "completed"}
+                                >
                                     ⬇
                                 </button>
                             </div>
+
+                            {/* Progress bar */}
                             <div className="file-row progress-bar-row">
                                 <div className="progress-bar">
-                                    <div className="progress-fill" />
+                                    <div
+                                        className="progress-fill"
+                                        style={{ width: `${download.status.progress || 0}%` }}
+                                    />
                                 </div>
                             </div>
                         </li>

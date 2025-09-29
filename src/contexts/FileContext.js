@@ -1,8 +1,9 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
-import { usePeer } from "./PeerContext";
-import {useFileMetadata} from "../hooks/useFileMetadata"; // Your PeerContext
+import React, { createContext, useState } from "react";
+import { useFileMetadata } from "../hooks/useFileMetadata";
+
 /**
  * @typedef {import('../interfaces/file').FileItem} FileItem
+ * @typedef {import('../interfaces/download').DownloadItem} DownloadItem
  */
 
 export const FileContext = createContext({
@@ -10,65 +11,62 @@ export const FileContext = createContext({
     addFiles: /** @type {(newFiles: File[]) => void} */ (() => {}),
     updateFile: /** @type {(id: string, updates: Partial<FileItem["status"] & { metaSent?: boolean }>) => void} */ (() => {}),
     removeFile: /** @type {(id: string) => void} */ (() => {}),
-    downloads: [],
-    setDownloads: () => {},
+    downloads: /** @type {DownloadItem[]} */ ([]),
+    addDownloads: /** @type {(downloads: DownloadItem[]) => void} */ (() => {}),
+    updateDownload: /** @type {(id: string, updates: Partial<DownloadItem["status"]>) => void} */ (() => {}),
+    removeDownload: /** @type {(id: string) => void} */ (() => {}),
 });
 
 export const FileProvider = ({ children }) => {
-    const { connection, isConnectionReady } = usePeer();
-    const [files, setFiles] = useState([]); // files to send
-    const [downloads, setDownloads] = useState([]); // files being received
+    const [files, setFiles] = useState([]);
+    const [downloads, setDownloads] = useState([]);
 
-    // Helper to generate unique 8-char ID
     const generateUniqueId = () => {
         let id;
         do {
             id = Math.random().toString(36).substring(2, 10);
-        } while (files.some((f) => f.id === id));
+        } while (files.some(f => f.id === id) || downloads.some(d => d.id === id));
         return id;
     };
 
-    // Add new files
+    // -------------------- File Operations --------------------
     const addFiles = (newFiles) => {
-        const items = newFiles.map((file) => ({
+        const items = newFiles.map(file => ({
             id: generateUniqueId(),
             file,
-            metadata: {
-                name: file.name,
-                size: file.size,
-                type: file.type,
-            },
+            metadata: { name: file.name, size: file.size, type: file.type },
             metaSent: false,
-            status: {
-                state: "pending",
-                progress: 0,
-            },
+            status: { state: "pending", progress: 0 },
         }));
-        setFiles((prev) => [...prev, ...items]);
+        setFiles(prev => [...prev, ...items]);
     };
 
-    // Update file status or metaSent by id
     const updateFile = (id, updates) => {
-        setFiles((prev) =>
-            prev.map((file) =>
+        setFiles(prev =>
+            prev.map(file =>
                 file.id === id
-                    ? {
-                        ...file,
-                        status: { ...file.status, ...updates },
-                        metaSent: updates.metaSent ?? file.metaSent,
-                    }
+                    ? { ...file, status: { ...file.status, ...updates }, metaSent: updates.metaSent ?? file.metaSent }
                     : file
             )
         );
     };
 
-    // Remove file by id
-    const removeFile = (id) => {
-        setFiles((prev) => prev.filter((file) => file.id !== id));
+    const removeFile = (id) => setFiles(prev => prev.filter(file => file.id !== id));
+
+    // -------------------- Download Operations --------------------
+    const addDownloads = (newDownloads) => {
+        setDownloads(prev => [...prev, ...newDownloads]);
     };
 
-    // Use the metadata hook
-    useFileMetadata(files, updateFile);
+    const updateDownload = (id, updates) =>
+        setDownloads(prev =>
+            prev.map(d => (d.id === id ? { ...d, status: { ...d.status, ...updates } } : d))
+        );
+
+    const removeDownload = (id) => setDownloads(prev => prev.filter(d => d.id !== id));
+
+    // -------------------- Metadata Hook --------------------
+    useFileMetadata(files, updateFile, addDownloads);
 
     return (
         <FileContext.Provider
@@ -78,7 +76,9 @@ export const FileProvider = ({ children }) => {
                 updateFile,
                 removeFile,
                 downloads,
-                setDownloads,
+                addDownloads,
+                updateDownload,
+                removeDownload,
             }}
         >
             {children}

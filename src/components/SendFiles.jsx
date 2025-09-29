@@ -11,6 +11,18 @@ const SendFileItem = memo(({ file, refProp }) => {
         100
     ).toFixed(2);
 
+    // Format speed if available
+    const formatSpeed = (bytesPerSec) => {
+        if (!bytesPerSec || bytesPerSec <= 0) return "";
+        return `${formatFileSize(bytesPerSec)}/s`;
+    };
+
+    // Dynamic status: show speed if sending
+    const statusText =
+        file.status.state === "sending"
+            ? `sending (${formatSpeed(file.status.speed)})`
+            : file.status.state;
+
     return (
         <li className="send-file-item" ref={refProp}>
             <div className="file-row file-name-row">
@@ -20,7 +32,7 @@ const SendFileItem = memo(({ file, refProp }) => {
                 <span className="file-progress-text">
                     {formatFileSize(file.status.progress)} / {formatFileSize(file.metadata.size)}
                 </span>
-                <span className="file-status">{file.status.state}</span>
+                <span className="file-status">{statusText}</span>
             </div>
             <div className="file-row progress-bar-row">
                 <div className="progress-bar">
@@ -33,6 +45,7 @@ const SendFileItem = memo(({ file, refProp }) => {
         </li>
     );
 });
+
 
 // -------------------- Main SendFiles Component --------------------
 const SendFiles = () => {

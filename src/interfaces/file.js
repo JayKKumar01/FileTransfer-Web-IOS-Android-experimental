@@ -10,7 +10,8 @@
 /**
  * @typedef {Object} FileStatus
  * @property {"pending"|"sending"|"sent"|"failed"} state - Current transfer state
- * @property {number} progress - Bytes sent so far
+ * @property {number} progress - Bytes sent so far (in bytes)
+ * @property {number} [speed] - Current transfer speed in bytes per second
  * @property {string} [error] - Optional error information
  */
 
@@ -22,3 +23,4 @@
  * @property {boolean} metaSent - Whether metadata has been sent to remote
  * @property {FileStatus} status - Dynamic transfer state
  */
+

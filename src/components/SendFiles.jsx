@@ -1,9 +1,40 @@
-import React, { useContext, useEffect, useRef } from "react";
+import React, { useContext, useEffect, useRef, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/SendFiles.css";
 import { FileContext } from "../contexts/FileContext";
 import { formatFileSize } from "../utils/fileUtil";
 
+// -------------------- Memoized File Item --------------------
+const SendFileItem = memo(({ file, refProp }) => {
+    const progressPercent = Math.min(
+        (file.status.progress / file.metadata.size) * 100,
+        100
+    ).toFixed(2);
+
+    return (
+        <li className="send-file-item" ref={refProp}>
+            <div className="file-row file-name-row">
+                <span className="file-name">{file.metadata.name}</span>
+            </div>
+            <div className="file-row file-progress-row">
+                <span className="file-progress-text">
+                    {formatFileSize(file.status.progress)} / {formatFileSize(file.metadata.size)}
+                </span>
+                <span className="file-status">{file.status.state}</span>
+            </div>
+            <div className="file-row progress-bar-row">
+                <div className="progress-bar">
+                    <div
+                        className="progress-fill"
+                        style={{ width: `${progressPercent}%` }}
+                    />
+                </div>
+            </div>
+        </li>
+    );
+});
+
+// -------------------- Main SendFiles Component --------------------
 const SendFiles = () => {
     const { files } = useContext(FileContext);
     const navigate = useNavigate();
@@ -32,43 +63,13 @@ const SendFiles = () => {
         <div className="send-files-container">
             <div className="send-files-list">
                 <ul>
-                    {files.map(file => {
-                        const progressPercent = Math.min(
-                            (file.status.progress / file.metadata.size) * 100,
-                            100
-                        ).toFixed(2);
-
-                        return (
-                            <li
-                                className="send-file-item"
-                                key={file.id}
-                                ref={el => (itemRefs.current[file.id] = el)}
-                            >
-                                {/* File name row */}
-                                <div className="file-row file-name-row">
-                                    <span className="file-name">{file.metadata.name}</span>
-                                </div>
-
-                                {/* Progress row */}
-                                <div className="file-row file-progress-row">
-                                    <span className="file-progress-text">
-                                        {formatFileSize(file.status.progress)} / {formatFileSize(file.metadata.size)}
-                                    </span>
-                                    <span className="file-status">{file.status.state}</span>
-                                </div>
-
-                                {/* Progress bar */}
-                                <div className="file-row progress-bar-row">
-                                    <div className="progress-bar">
-                                        <div
-                                            className="progress-fill"
-                                            style={{ width: `${progressPercent}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            </li>
-                        );
-                    })}
+                    {files.map(file => (
+                        <SendFileItem
+                            key={file.id}
+                            file={file}
+                            refProp={el => (itemRefs.current[file.id] = el)}
+                        />
+                    ))}
                 </ul>
             </div>
 

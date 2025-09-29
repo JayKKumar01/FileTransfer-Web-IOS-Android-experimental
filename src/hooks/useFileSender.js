@@ -60,7 +60,7 @@ export const useFileSender = (files, updateFile) => {
             updateFile(file.id, { progress: bytesSent });
         } else {
             console.log(`🎉 File transfer completed: "${file.metadata.name}"`);
-            updateFile(file.id, { state: "completed", progress: file.metadata.size });
+            updateFile(file.id, { state: "sent", progress: file.metadata.size });
 
             currentFileIdRef.current = null;
             currentChunkIndexRef.current = 0;

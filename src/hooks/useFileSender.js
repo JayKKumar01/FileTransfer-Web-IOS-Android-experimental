@@ -11,13 +11,13 @@ const CHUNK_SIZE = 256 * 1024; // 256 KB
 export const useFileSender = (files, updateFile) => {
     const { connection, isConnectionReady } = usePeer();
 
-    const [currentFileId, setCurrentFileId] = useState(null);
+    const currentFileIdRef = useRef(null);
     const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
     const isSendingRef = useRef(false);
 
     // -------------------- Helper: Start file transfer --------------------
     const startFileTransfer = (file) => {
-        setCurrentFileId(file.id);
+        currentFileIdRef.current = file.id;
         setCurrentChunkIndex(0);
         isSendingRef.current = true;
 
@@ -42,7 +42,12 @@ export const useFileSender = (files, updateFile) => {
 
     // -------------------- Handle ACK → send next --------------------
     const processAck = (ack) => {
-        if (ack.fileId !== currentFileId) return;
+        if (ack.fileId !== currentFileIdRef.current) {
+            console.log("Not the current file, ignoring ack:", ack);
+            console.log("Current file:", currentFileIdRef.current);
+            console.log("Ack file:", ack.fileId);
+            return;
+        }
 
         console.log(`✅ Ack for file ${ack.fileId}, chunk #${ack.chunkIndex}`);
 
@@ -56,18 +61,12 @@ export const useFileSender = (files, updateFile) => {
         if (!isLastChunk) {
             setCurrentChunkIndex(nextChunk);
             sendChunk(file, nextChunk);
-
-            updateFile(file.id, {
-                progress: bytesSent,
-            });
+            updateFile(file.id, { progress: bytesSent });
         } else {
             console.log(`🎉 File transfer completed: "${file.metadata.name}"`);
-            updateFile(file.id, {
-                state: "completed",
-                progress: file.metadata.size,
-            });
+            updateFile(file.id, { state: "completed", progress: file.metadata.size });
 
-            setCurrentFileId(null);
+            currentFileIdRef.current = null;
             setCurrentChunkIndex(0);
             isSendingRef.current = false;
         }
@@ -95,5 +94,5 @@ export const useFileSender = (files, updateFile) => {
 
         connection.on("data", handleData);
         return () => connection.off("data", handleData);
-    }, [connection, files, currentFileId, currentChunkIndex]);
+    }, [connection, files, currentChunkIndex]);
 };

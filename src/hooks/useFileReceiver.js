@@ -18,6 +18,7 @@ export const useFileReceiver = () => {
             // Log received chunk size
             const chunkSize = data.data.byteLength ?? 0;
             console.log(`⬅️ Received chunk #${chunkIndex} for file ID: ${fileId} → Size: ${chunkSize} bytes`);
+            data.data = null;
 
             // ✅ Ack back immediately
             connection.send({

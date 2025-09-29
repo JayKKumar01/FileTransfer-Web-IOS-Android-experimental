@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/SendFiles.css";
 import { FileContext } from "../contexts/FileContext";
@@ -7,54 +7,74 @@ import { formatFileSize } from "../utils/fileUtil";
 const SendFiles = () => {
     const { files } = useContext(FileContext);
     const navigate = useNavigate();
+    const itemRefs = useRef({});
+
+    // Scroll to the first file that is currently sending
+    useEffect(() => {
+        const sendingFile = files.find(f => f.status.state === "sending");
+        if (sendingFile && itemRefs.current[sendingFile.id]) {
+            itemRefs.current[sendingFile.id].scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+            });
+        }
+    }, [files]);
+
+    if (files.length === 0) {
+        return (
+            <div className="send-files-container">
+                <p className="no-files-text">No files to send.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="send-files-container">
-            {files.length === 0 ? (
-                <p className="no-files-text">No files to send.</p>
-            ) : (
-                <div className="send-files-list">
-                    <ul>
-                        {files.map((file) => {
-                            const progressPercent = Math.min(
-                                (file.status.progress / file.metadata.size) * 100,
-                                100
-                            ).toFixed(2);
+            <div className="send-files-list">
+                <ul>
+                    {files.map(file => {
+                        const progressPercent = Math.min(
+                            (file.status.progress / file.metadata.size) * 100,
+                            100
+                        ).toFixed(2);
 
-                            return (
-                                <li className="send-file-item" key={file.id}>
-                                    {/* File name row */}
-                                    <div className="file-row file-name-row">
-                                        <span className="file-name">{file.metadata.name}</span>
-                                    </div>
+                        return (
+                            <li
+                                className="send-file-item"
+                                key={file.id}
+                                ref={el => (itemRefs.current[file.id] = el)}
+                            >
+                                {/* File name row */}
+                                <div className="file-row file-name-row">
+                                    <span className="file-name">{file.metadata.name}</span>
+                                </div>
 
-                                    {/* Progress row */}
-                                    <div className="file-row file-progress-row">
-                    <span className="file-progress-text">
-                      {formatFileSize(file.status.progress)} / {formatFileSize(file.metadata.size)}
-                    </span>
-                                        <span className="file-status">{file.status.state}</span>
-                                    </div>
+                                {/* Progress row */}
+                                <div className="file-row file-progress-row">
+                                    <span className="file-progress-text">
+                                        {formatFileSize(file.status.progress)} / {formatFileSize(file.metadata.size)}
+                                    </span>
+                                    <span className="file-status">{file.status.state}</span>
+                                </div>
 
-                                    {/* Progress bar */}
-                                    <div className="file-row progress-bar-row">
-                                        <div className="progress-bar">
-                                            <div
-                                                className="progress-fill"
-                                                style={{ width: `${progressPercent}%` }}
-                                            />
-                                        </div>
+                                {/* Progress bar */}
+                                <div className="file-row progress-bar-row">
+                                    <div className="progress-bar">
+                                        <div
+                                            className="progress-fill"
+                                            style={{ width: `${progressPercent}%` }}
+                                        />
                                     </div>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-            )}
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
 
             <span className="back-button" onClick={() => navigate("/files")}>
-        Return to File Selection
-      </span>
+                Return to File Selection
+            </span>
         </div>
     );
 };

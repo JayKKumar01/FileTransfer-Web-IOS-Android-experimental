@@ -1,16 +1,13 @@
 /* chunkUtil.js */
 import streamSaver from "streamsaver";
 
-const DB_NAME = "FileTransferDB";
-const META_STORE = "fileMeta";
-const CHUNK_STORE = "fileChunks";
-
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const DB_NAME = "SimpleFileTransfer";
+const FILES_STORE = "files";
+const CHUNKS_STORE = "chunks";
 
 let dbInstance = null;
 let externalLogger = null;
 
-// Set the external logger from FileSender
 export const setChunkUtilLogger = (logger) => {
     externalLogger = logger;
 };
@@ -23,26 +20,8 @@ const log = (message) => {
     }
 };
 
-const logError = (message) => {
-    if (externalLogger) {
-        externalLogger(`❌ ${message}`);
-    } else {
-        console.error(message);
-    }
-};
+// --------------------- SIMPLE DATABASE --------------------- //
 
-// --------------------- DATABASE SETUP --------------------- //
-export const deleteDatabase = () =>
-    new Promise((resolve, reject) => {
-        if (dbInstance) {
-            dbInstance.close();
-            dbInstance = null;
-        }
-        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-        deleteRequest.onsuccess = () => resolve();
-        deleteRequest.onerror = (err) => reject(err);
-        deleteRequest.onblocked = () => console.warn("Database deletion blocked.");
-    });
 const openDB = () => {
     if (dbInstance) return Promise.resolve(dbInstance);
 
@@ -58,45 +37,36 @@ const openDB = () => {
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
-            if (!db.objectStoreNames.contains(META_STORE)) {
-                db.createObjectStore(META_STORE, { keyPath: "fileId" });
+
+            // Simple files store - just file metadata
+            if (!db.objectStoreNames.contains(FILES_STORE)) {
+                db.createObjectStore(FILES_STORE, { keyPath: "id" });
             }
-            if (!db.objectStoreNames.contains(CHUNK_STORE)) {
-                const store = db.createObjectStore(CHUNK_STORE, { autoIncrement: true });
-                store.createIndex("fileIdIndex", "fileId", { unique: false });
+
+            // Simple chunks store - just chunk data with file reference
+            if (!db.objectStoreNames.contains(CHUNKS_STORE)) {
+                const store = db.createObjectStore(CHUNKS_STORE, { autoIncrement: true });
+                store.createIndex("fileId", "fileId", { unique: false });
             }
         };
     });
 };
 
-// --------------------- FILE MANAGEMENT --------------------- //
+// --------------------- FILE OPERATIONS --------------------- //
 
-export const createStore = async (fileId, fileName) => {
+export const createFileRecord = async (fileId, fileName, fileSize) => {
     const db = await openDB();
 
     return new Promise((resolve, reject) => {
-        const tx = db.transaction([META_STORE], "readwrite");
-        const store = tx.objectStore(META_STORE);
-        store.put({ fileId, fileName, createdAt: Date.now() });
+        const tx = db.transaction([FILES_STORE], "readwrite");
+        const store = tx.objectStore(FILES_STORE);
 
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-};
-
-export const saveChunk = async (fileId, chunk, chunkIndex) => {
-    const db = await openDB();
-
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction([CHUNK_STORE], "readwrite");
-        const store = tx.objectStore(CHUNK_STORE);
-
-        // Store each chunk individually with its index for proper ordering
-        store.add({
-            fileId,
-            data: chunk,
-            chunkIndex,
-            timestamp: Date.now()
+        store.put({
+            id: fileId,
+            name: fileName,
+            size: fileSize,
+            createdAt: Date.now(),
+            chunkCount: 0
         });
 
         tx.oncomplete = () => resolve();
@@ -104,12 +74,44 @@ export const saveChunk = async (fileId, chunk, chunkIndex) => {
     });
 };
 
-export const getStoredChunksCount = async (fileId) => {
+export const saveFileChunk = async (fileId, chunkData, chunkIndex) => {
     const db = await openDB();
 
     return new Promise((resolve, reject) => {
-        const tx = db.transaction([CHUNK_STORE], "readonly");
-        const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+        const tx = db.transaction([CHUNKS_STORE], "readwrite");
+        const store = tx.objectStore(CHUNKS_STORE);
+
+        // Store chunk with minimal metadata
+        store.add({
+            fileId: fileId,
+            data: chunkData,
+            index: chunkIndex
+        });
+
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+};
+
+export const getFileInfo = async (fileId) => {
+    const db = await openDB();
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([FILES_STORE], "readonly");
+        const store = tx.objectStore(FILES_STORE);
+        const req = store.get(fileId);
+
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getChunkCount = async (fileId) => {
+    const db = await openDB();
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([CHUNKS_STORE], "readonly");
+        const store = tx.objectStore(CHUNKS_STORE).index("fileId");
         const req = store.count(IDBKeyRange.only(fileId));
 
         req.onsuccess = () => resolve(req.result);
@@ -117,177 +119,139 @@ export const getStoredChunksCount = async (fileId) => {
     });
 };
 
-export const getFileName = async (fileId) => {
+export const deleteFile = async (fileId) => {
     const db = await openDB();
 
     return new Promise((resolve, reject) => {
-        const tx = db.transaction([META_STORE], "readonly");
-        const store = tx.objectStore(META_STORE);
-        const req = store.get(fileId);
+        const tx = db.transaction([FILES_STORE, CHUNKS_STORE], "readwrite");
+        const filesStore = tx.objectStore(FILES_STORE);
+        const chunksStore = tx.objectStore(CHUNKS_STORE).index("fileId");
 
-        req.onsuccess = () => resolve(req.result?.fileName || "download.bin");
-        req.onerror = () => reject(req.error);
-    });
-};
-
-export const clearFileData = async (fileId) => {
-    const db = await openDB();
-
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction([CHUNK_STORE, META_STORE], "readwrite");
-        const chunkStore = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
-        const metaStore = tx.objectStore(META_STORE);
+        // Delete file record
+        filesStore.delete(fileId);
 
         // Delete all chunks
-        const chunkReq = chunkStore.openCursor(IDBKeyRange.only(fileId));
-        let chunksDeleted = 0;
+        const req = chunksStore.openCursor(IDBKeyRange.only(fileId));
+        let deletedChunks = 0;
 
-        chunkReq.onsuccess = (event) => {
+        req.onsuccess = (event) => {
             const cursor = event.target.result;
             if (cursor) {
                 cursor.delete();
-                chunksDeleted++;
+                deletedChunks++;
                 cursor.continue();
             }
         };
 
-        // Delete metadata
-        metaStore.delete(fileId);
-
         tx.oncomplete = () => {
-            log(`🧹 Cleared ${chunksDeleted} chunks for file ${fileId}`);
-            resolve(chunksDeleted);
+            log(`🗑️ Deleted file ${fileId} with ${deletedChunks} chunks`);
+            resolve(deletedChunks);
         };
 
         tx.onerror = () => reject(tx.error);
     });
 };
 
-// --------------------- DOWNLOAD LOGIC --------------------- //
+export const deleteDatabase = async () => {
+    if (dbInstance) {
+        dbInstance.close();
+        dbInstance = null;
+    }
+
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(DB_NAME);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
+// --------------------- DOWNLOAD OPERATIONS --------------------- //
 
 export const downloadFile = async (fileId, onProgress) => {
-    const fileName = await getFileName(fileId);
-    const db = await openDB();
-
-    // Get total chunks count
-    const totalChunks = await getStoredChunksCount(fileId);
-    log(`📊 Starting download: ${fileName} (${totalChunks} chunks)`);
-
-    if (totalChunks === 0) {
-        throw new Error("No chunks found for this file");
+    const fileInfo = await getFileInfo(fileId);
+    if (!fileInfo) {
+        throw new Error("File not found");
     }
+
+    const totalChunks = await getChunkCount(fileId);
+    log(`Starting download: ${fileInfo.name} (${totalChunks} chunks)`);
 
     let processedChunks = 0;
 
-    // Create the file stream
-    const fileStream = streamSaver.createWriteStream(fileName);
+    // Create file stream
+    const fileStream = streamSaver.createWriteStream(fileInfo.name);
     const writer = fileStream.getWriter();
 
     try {
-        // Get all chunk keys in order
-        const chunkKeys = await new Promise((resolve, reject) => {
-            const tx = db.transaction([CHUNK_STORE], "readonly");
-            const store = tx.objectStore(CHUNK_STORE).index("fileIdIndex");
+        // Get all chunks in order
+        const chunks = await new Promise((resolve, reject) => {
+            const tx = dbInstance.transaction([CHUNKS_STORE], "readonly");
+            const store = tx.objectStore(CHUNKS_STORE).index("fileId");
             const request = store.openCursor(IDBKeyRange.only(fileId));
-            const keys = [];
+            const chunkList = [];
 
             request.onsuccess = (event) => {
                 const cursor = event.target.result;
                 if (cursor) {
-                    keys.push({
+                    chunkList.push({
                         key: cursor.primaryKey,
-                        chunkIndex: cursor.value.chunkIndex,
-                        size: cursor.value.data.byteLength
+                        data: cursor.value.data,
+                        index: cursor.value.index
                     });
                     cursor.continue();
                 } else {
-                    // Sort by chunkIndex to ensure correct order
-                    keys.sort((a, b) => a.chunkIndex - b.chunkIndex);
-                    resolve(keys);
+                    // Sort by index to ensure correct order
+                    chunkList.sort((a, b) => a.index - b.index);
+                    resolve(chunkList);
                 }
             };
 
             request.onerror = () => reject(request.error);
         });
 
-        log(`🔢 Processing ${chunkKeys.length} chunks in order`);
+        log(`Processing ${chunks.length} chunks...`);
 
-        // Process chunks sequentially
-        for (const chunkInfo of chunkKeys) {
-            // Read chunk data
-            const chunkData = await new Promise((resolve, reject) => {
-                const tx = db.transaction([CHUNK_STORE], "readonly");
-                const store = tx.objectStore(CHUNK_STORE);
-                const req = store.get(chunkInfo.key);
-
-                req.onsuccess = () => {
-                    if (req.result && req.result.data) {
-                        resolve(req.result.data);
-                    } else {
-                        reject(new Error(`Missing data for chunk ${chunkInfo.chunkIndex}`));
-                    }
-                };
-                req.onerror = () => reject(req.error);
-            });
-
-            // Write to file stream
-            await writer.write(new Uint8Array(chunkData));
-
+        // Write chunks to file
+        for (const chunk of chunks) {
+            await writer.write(new Uint8Array(chunk.data));
             processedChunks++;
 
             // Update progress
             const progress = Math.round((processedChunks / totalChunks) * 100);
             if (onProgress) {
-                onProgress(progress, processedChunks, totalChunks);
+                onProgress(progress);
             }
-
-            log(`📦 Written chunk ${processedChunks}/${totalChunks} (${progress}%) - ${chunkData.byteLength} bytes`);
 
             // Delete chunk immediately after writing
             await new Promise((resolve, reject) => {
-                const tx = db.transaction([CHUNK_STORE], "readwrite");
-                const store = tx.objectStore(CHUNK_STORE);
-                const req = store.delete(chunkInfo.key);
+                const tx = dbInstance.transaction([CHUNKS_STORE], "readwrite");
+                const store = tx.objectStore(CHUNKS_STORE);
+                const req = store.delete(chunk.key);
 
                 req.onsuccess = () => resolve();
                 req.onerror = () => reject(req.error);
             });
 
-            // iOS Memory Management
-            if (isIOS) {
-                // Force garbage collection breaks
-                if (processedChunks % 3 === 0) {
-                    await new Promise(resolve => setTimeout(resolve, 10));
-                }
-
-                // More aggressive cleanup near completion
-                if (processedChunks > totalChunks * 0.8) {
-                    await new Promise(resolve => setTimeout(resolve, 15));
-                }
+            // Small delay to prevent UI blocking
+            if (processedChunks % 5 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 1));
             }
         }
 
-        // Finalize the file
+        // Finalize file
         await writer.close();
-        log(`✅ Download completed: ${fileName}`);
+        log(`Download completed: ${fileInfo.name}`);
 
-        // Clean up metadata
-        await clearFileData(fileId);
-
-        return fileName;
+        // Clean up file record
+        await deleteFile(fileId);
 
     } catch (error) {
-        // Emergency cleanup on error
+        // Emergency cleanup
         try {
             await writer.abort();
-        } catch (abortError) {
-            logError(`⚠️ Writer abort failed: ${abortError.message}`);
+        } catch (e) {
+            // Ignore abort errors
         }
-
-        logError(`❌ Download failed: ${error.message}`);
         throw error;
     }
 };
-
-// Export for backward compatibility
-export { downloadFile as downloadFileManual };

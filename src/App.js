@@ -13,15 +13,17 @@ import ReceiveFiles from "./components/ReceiveFiles";
 import FileChunkTest from "./components/FileChunkTest";
 import FileSenderTest from "./components/FileSenderTest"; // ✅ test component
 
-import {deleteDatabase} from "./utils/chunkUtil";
+// import {deleteDatabase} from "./utils/chunkUtil";
 import FileChunkReader from "./components/FileChunkReader";
 import AndroidChunkSpeedTest from "./components/AndroidChunkSpeedTest";
-import PeerFileBenchmark from "./components/PeerFileBenchmark"; // import your delete function
-
-// ✅ Delete DB immediately at app start
-deleteDatabase()
-    .then(() => console.log("✅ IndexedDB cleared."))
-    .catch((err) => console.error("❌ Failed to clear DB:", err));
+import PeerFileBenchmark from "./components/PeerFileBenchmark";
+import IndexedDBFileHandler from "./components/IndexedDBFileHandler";
+import FileStreamSaver from "./components/FileStreamSaver"; // import your delete function
+//
+// // ✅ Delete DB immediately at app start
+// deleteDatabase()
+//     .then(() => console.log("✅ IndexedDB cleared."))
+//     .catch((err) => console.error("❌ Failed to clear DB:", err));
 
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
@@ -79,7 +81,7 @@ function App() {
                             <Route path="/files" element={<PeerFileBenchmark />} />
                             <Route path="/send" element={<SendFiles />} />
                             <Route path="/receive" element={<ReceiveFiles />} />
-                            <Route path="/test-chunk" element={<FileSenderTest />} /> {/* ✅ new test route */}
+                            <Route path="/test-chunk" element={<FileStreamSaver />} /> {/* ✅ new test route */}
                             <Route path="*" element={<PeerConnect />} />
                         </Routes>
 

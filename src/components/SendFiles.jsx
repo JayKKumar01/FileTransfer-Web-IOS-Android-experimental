@@ -17,7 +17,7 @@ const SendFiles = () => {
                     <ul>
                         {files.map((file) => {
                             const progressPercent = Math.min(
-                                (file.progress / file.size) * 100,
+                                (file.status.progress / file.metadata.size) * 100,
                                 100
                             ).toFixed(2);
 
@@ -25,15 +25,15 @@ const SendFiles = () => {
                                 <li className="send-file-item" key={file.id}>
                                     {/* File name row */}
                                     <div className="file-row file-name-row">
-                                        <span className="file-name">{file.name}</span>
-                                        <span className="file-status">{file.status}</span>
+                                        <span className="file-name">{file.metadata.name}</span>
                                     </div>
 
-                                    {/* Progress text */}
+                                    {/* Progress row */}
                                     <div className="file-row file-progress-row">
                     <span className="file-progress-text">
-                      {formatFileSize(file.progress)} / {formatFileSize(file.size)}
+                      {formatFileSize(file.status.progress)} / {formatFileSize(file.metadata.size)}
                     </span>
+                                        <span className="file-status">{file.status.state}</span>
                                     </div>
 
                                     {/* Progress bar */}

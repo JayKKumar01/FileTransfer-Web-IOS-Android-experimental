@@ -6,7 +6,7 @@ import {
     downloadFile,
     setChunkUtilLogger,
     deleteDatabase
-} from "../utils/chunkUtil";
+} from "./chunkUtil";
 
 const CHUNK_SIZE = 256 * 1024; // 256KB
 

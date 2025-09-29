@@ -1,6 +1,6 @@
 import React, { useState, useRef, useContext } from "react";
 import { LogContext } from "../contexts/LogContext";
-import { setItem, getItem, removeItem, clearStore } from "../utils/dbUtil";
+import { setItem, getItem, removeItem, clearStore } from "./dbUtil";
 
 const useLogger = () => {
     const { pushLog } = useContext(LogContext);

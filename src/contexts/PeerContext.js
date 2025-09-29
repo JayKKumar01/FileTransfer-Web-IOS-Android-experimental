@@ -70,7 +70,6 @@ export const PeerProvider = ({ children }) => {
             setRemoteId(rid);
             setIsConnectionReady(true);
         });
-        // conn.on("data", (data) => log(`Received data: ${JSON.stringify(data)}`));
         conn.on("close", () => log("Data connection closed."));
         conn.on("error", (err) => log(`Data connection error: ${err}`));
     };

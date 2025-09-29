@@ -10,15 +10,16 @@ import { usePeer } from "./contexts/PeerContext";
 import TabBar from "./components/TabBar";
 import SendFiles from "./components/SendFiles";
 import ReceiveFiles from "./components/ReceiveFiles";
-import FileChunkTest from "./components/FileChunkTest";
-import FileSenderTest from "./components/FileSenderTest"; // ✅ test component
+import FileChunkTest from "./old/FileChunkTest";
+import FileSenderTest from "./old/FileSenderTest"; // ✅ test component
 
 // import {deleteDatabase} from "./utils/chunkUtil";
-import FileChunkReader from "./components/FileChunkReader";
-import AndroidChunkSpeedTest from "./components/AndroidChunkSpeedTest";
-import PeerFileBenchmark from "./components/PeerFileBenchmark";
-import IndexedDBFileHandler from "./components/IndexedDBFileHandler";
-import FileStreamSaver from "./components/FileStreamSaver"; // import your delete function
+import FileChunkReader from "./old/FileChunkReader";
+import AndroidChunkSpeedTest from "./old/AndroidChunkSpeedTest";
+import PeerFileBenchmark from "./old/PeerFileBenchmark";
+import IndexedDBFileHandler from "./old/IndexedDBFileHandler";
+import FileStreamSaver from "./old/FileStreamSaver";
+import FakeDownload from "./components/FakeDownload"; // import your delete function
 //
 // // ✅ Delete DB immediately at app start
 // deleteDatabase()
@@ -77,19 +78,11 @@ function App() {
                     <>
                         <Routes>
                             <Route path="/connect" element={<PeerConnect />} />
-                            <Route path="/files0" element={<FileInput />} />
-                            <Route path="/files" element={<PeerFileBenchmark />} />
+                            <Route path="/files" element={<FileInput />} />
                             <Route path="/send" element={<SendFiles />} />
                             <Route path="/receive" element={<ReceiveFiles />} />
-                            <Route path="/test-chunk" element={<FileStreamSaver />} /> {/* ✅ new test route */}
                             <Route path="*" element={<PeerConnect />} />
                         </Routes>
-
-                        <div style={{ marginTop: "15px", textAlign: "center" }}>
-                            <button onClick={handleTestClick}>
-                                Test File Chunking & IndexedDB
-                            </button>
-                        </div>
                     </>
                 )}
             </main>
@@ -110,3 +103,7 @@ function App() {
 }
 
 export default App;
+
+
+//if one file then download that directly using url object, if multiple then zip, if android then mulitple downloads
+//all using the database, clear the db at end, but keep clearing as the files are added to zip for ios or downlaoded for android

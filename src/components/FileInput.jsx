@@ -14,41 +14,36 @@ const FileItem = memo(({ file, onRemove }) => {
 
     return (
         <li className={`FileItem ${removing ? "removing" : ""}`}>
-            <span className="FileNameText">{file.name}</span>
-            <button className="RemoveFileButton" onClick={handleRemove}>×</button>
+            <span className="FileNameText">{file.metadata.name}</span>
+            <button className="RemoveFileButton" onClick={handleRemove}>
+                ×
+            </button>
         </li>
     );
 });
 
 // -------------------- File Input Component --------------------
 const FileInput = () => {
-    const { files, setFiles } = useContext(FileContext);
+    const { addFiles, files } = useContext(FileContext);
     const [tempFiles, setTempFiles] = useState([]);
     const navigate = useNavigate();
 
     // Handle file selection
     const handleFilesChange = (event) => {
-        const newFiles = Array.from(event.target.files).map((file) => ({
-            id: `${file.name}-${file.size}-${Date.now()}`, // unique id
-            file,
-            name: file.name,
-            size: file.size,
-            progress: 0,          // ready for chunked sending
-            status: "pending",    // "pending" | "sending" | "completed"
-        }));
-        setTempFiles(newFiles);
+        const selectedFiles = Array.from(event.target.files);
+        setTempFiles(selectedFiles);
         event.target.value = null; // reset input
     };
 
     // Remove a file from tempFiles
-    const removeFile = (id) => {
-        setTempFiles((prev) => prev.filter((f) => f.id !== id));
+    const removeFile = (fileToRemove) => {
+        setTempFiles((prev) => prev.filter((f) => f !== fileToRemove));
     };
 
-    // Move files from temp to main context
+    // Move files from temp to main context using addFiles helper
     const handleShare = () => {
         if (tempFiles.length === 0) return;
-        setFiles((prevFiles) => [...prevFiles, ...tempFiles]);
+        addFiles(tempFiles); // FileContext handles full FileItem creation
         setTempFiles([]);
         navigate("/send");
     };
@@ -79,7 +74,14 @@ const FileInput = () => {
                 <div className="FileList">
                     <ul>
                         {tempFiles.map((file) => (
-                            <FileItem key={file.id} file={file} onRemove={removeFile} />
+                            <FileItem
+                                key={file.name + file.size + file.lastModified} // unique key
+                                file={{
+                                    id: file.name + file.lastModified, // temp id only for rendering
+                                    metadata: { name: file.name },
+                                }}
+                                onRemove={() => removeFile(file)}
+                            />
                         ))}
                     </ul>
                 </div>

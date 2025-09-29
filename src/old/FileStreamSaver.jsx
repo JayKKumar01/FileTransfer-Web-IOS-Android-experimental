@@ -2,8 +2,7 @@ import React, { useState, useRef } from "react";
 import streamSaver from "streamsaver";
 
 const FileStreamSaver = () => {
-    const CHUNK_SIZE = 256 * 1024; // 256 KB - keep this size for Safari
-
+    const [chunkSize, setChunkSize] = useState(256 * 1024); // default 256 KB
     const [progress, setProgress] = useState(0);
     const [status, setStatus] = useState("Idle");
     const [currentChunk, setCurrentChunk] = useState(0);
@@ -11,14 +10,20 @@ const FileStreamSaver = () => {
     const writerRef = useRef(null);
     const cancelRef = useRef(false);
 
-    // iOS Safari optimization: Use direct blob writing to avoid memory issues
-    async function writeChunkToWriter(writer, blob) {
-        // Convert blob to array buffer - this is the memory-critical part
-        const buffer = await blob.arrayBuffer();
-        await writer.write(new Uint8Array(buffer));
+    // Use refs for values that don't need re-renders
+    const progressRef = useRef(0);
+    const currentChunkRef = useRef(0);
 
-        // Force garbage collection by releasing references
-        blob = null;
+    // Batch UI updates - only update at most once per frame
+    const updateUI = React.useCallback(() => {
+        requestAnimationFrame(() => {
+            setProgress(progressRef.current);
+            setCurrentChunk(currentChunkRef.current);
+        });
+    }, []);
+
+    async function writeChunkToWriter(writer, buffer) {
+        await writer.write(new Uint8Array(buffer));
     }
 
     const handleCancel = async () => {
@@ -33,7 +38,6 @@ const FileStreamSaver = () => {
         }
     };
 
-    // Optimized for iOS Safari - memory management is crucial
     const handleFile = async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -42,23 +46,19 @@ const FileStreamSaver = () => {
         setProgress(0);
         setStatus("Preparing...");
         setCurrentChunk(0);
+        setTotalChunks(0);
+        progressRef.current = 0;
+        currentChunkRef.current = 0;
         cancelRef.current = false;
         writerRef.current = null;
 
-        // Safari-specific: Check file size limitations
-        if (file.size > 10 * 1024 * 1024 * 1024) { // 10GB
-            setStatus("Error: File too large for Safari");
-            return;
-        }
-
         const fileName = file.name;
-        const chunks = Math.ceil(file.size / CHUNK_SIZE);
+        const chunks = Math.ceil(file.size / chunkSize);
         setTotalChunks(chunks);
 
         try {
             setStatus("Creating file stream...");
 
-            // Critical: Use proper MIME type for Safari
             const fileStream = streamSaver.createWriteStream(fileName, {
                 size: file.size
             });
@@ -68,7 +68,6 @@ const FileStreamSaver = () => {
 
             setStatus(`Processing ${chunks.toLocaleString()} chunks...`);
 
-            // Process chunks sequentially with memory management
             for (let i = 0; i < chunks; i++) {
                 if (cancelRef.current) {
                     setStatus("Cancelled by user");
@@ -76,36 +75,35 @@ const FileStreamSaver = () => {
                     return;
                 }
 
-                const start = i * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, file.size);
-
-                // Create blob slice without loading into memory immediately
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
                 const slice = file.slice(start, end);
+                const buffer = await slice.arrayBuffer();
 
-                setStatus(`Writing chunk ${i + 1} / ${chunks}...`);
-
-                // Write chunk and wait for completion
-                await writeChunkToWriter(writer, slice);
-
-                // Update UI
-                setCurrentChunk(i + 1);
-                setProgress(((i + 1) / chunks) * 100);
-
-                // Safari optimization: More aggressive yielding
-                if (i % 10 === 0) { // Yield every 10 chunks to prevent UI blocking
-                    await new Promise((res) => setTimeout(res, 0));
+                if (i % 10 === 0 || i === chunks - 1) {
+                    setStatus(`Writing chunk ${i + 1} / ${chunks}...`);
                 }
 
-                // Force garbage collection opportunity
-                if (i % 100 === 0) {
-                    await new Promise((res) => setTimeout(res, 1));
+                await writeChunkToWriter(writer, buffer);
+
+                currentChunkRef.current = i + 1;
+                progressRef.current = ((i + 1) / chunks) * 100;
+
+                if (i % 5 === 0 || i === chunks - 1) {
+                    updateUI();
+                }
+
+                if (i % 10 === 0) {
+                    await new Promise((res) => setTimeout(res, 0));
                 }
             }
 
-            // Finalize
+            progressRef.current = 100;
+            currentChunkRef.current = chunks;
+            updateUI();
+
             await writer.close();
             setStatus("File saved successfully 🎉");
-            setProgress(100);
 
         } catch (err) {
             console.error("Write error:", err);
@@ -142,7 +140,6 @@ const FileStreamSaver = () => {
     const progressInner = {
         height: "100%",
         width: `${progress}%`,
-        transition: "width 0.12s linear",
         background: progress === 100 ? "#10b981" : "#2563eb",
     };
 
@@ -174,6 +171,28 @@ const FileStreamSaver = () => {
                 }}
             />
 
+            {/* Dropdown for chunk size */}
+            <select
+                value={chunkSize}
+                onChange={(e) => setChunkSize(Number(e.target.value))}
+                style={{
+                    display: "block",
+                    width: "100%",
+                    padding: "8px",
+                    borderRadius: 8,
+                    border: "1px solid #e6eef8",
+                    marginBottom: 12,
+                    background: "#f8fafc",
+                    cursor: "pointer"
+                }}
+            >
+                <option value={256 * 1024}>256 KB</option>
+                <option value={512 * 1024}>512 KB</option>
+                <option value={1024 * 1024}>1 MB</option>
+                <option value={2 * 1024 * 1024}>2 MB</option>
+                <option value={4 * 1024 * 1024}>4 MB</option>
+            </select>
+
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
                 <div style={{ flex: 1 }}>
                     <div style={progressOuter}>
@@ -184,7 +203,7 @@ const FileStreamSaver = () => {
                             {currentChunk.toLocaleString()}/{totalChunks.toLocaleString()} chunks
                         </div>
                         <div style={{ fontSize: 12, color: "#64748b" }}>
-                            {progress ? progress.toFixed(2) : 0}%
+                            {progress.toFixed(1)}%
                         </div>
                     </div>
                 </div>
@@ -208,7 +227,7 @@ const FileStreamSaver = () => {
             </div>
 
             <div style={small}>
-                <div>Chunk size: {(CHUNK_SIZE / 1024).toLocaleString()} KB</div>
+                <div>Chunk size: {(chunkSize / 1024).toLocaleString()} KB</div>
                 <div style={{
                     marginTop: 6,
                     fontWeight: 600,
@@ -217,11 +236,6 @@ const FileStreamSaver = () => {
                 }}>
                     {status}
                 </div>
-                {status === "Idle" && (
-                    <div style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
-                        iOS Safari: Optimized for large files up to 10GB
-                    </div>
-                )}
             </div>
         </div>
     );

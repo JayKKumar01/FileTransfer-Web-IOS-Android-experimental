@@ -50,22 +50,36 @@
 }
 
 /* File name row */
+.file-name-row {
+    justify-content: flex-start; /* Left aligned */
+}
+
 .file-name-row .file-name {
     font-weight: 500;
     color: #ffffff;
     line-height: 1.2rem;
-    overflow-wrap: break-word;
+    overflow-wrap: break-word; /* Multiline wrapping */
+    word-break: break-word;
+    text-align: left;
 }
 
 /* Progress row */
 .file-progress-row {
-    justify-content: flex-start;
+    display: flex;
+    justify-content: space-between; /* Left: progress text, Right: status */
     align-items: center;
 }
 
 .file-progress-text {
     font-size: 0.85rem;
     color: #88b0ff;
+}
+
+.file-status {
+    font-size: 0.85rem;
+    color: #a0a0a0; /* Slightly greyed out */
+    font-weight: 400; /* Not bold */
+    white-space: nowrap;
 }
 
 /* Progress bar row */
@@ -124,7 +138,13 @@
         line-height: 1.15rem;
     }
 
+    .file-progress-row {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
     .file-progress-text,
+    .file-status,
     .back-button {
         font-size: 0.85rem;
     }

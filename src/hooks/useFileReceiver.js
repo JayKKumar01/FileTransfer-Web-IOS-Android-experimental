@@ -15,6 +15,10 @@ export const useFileReceiver = () => {
 
             const { fileId, chunkIndex } = data;
 
+            // Log received chunk size
+            const chunkSize = data.data.byteLength ?? 0;
+            console.log(`⬅️ Received chunk #${chunkIndex} for file ID: ${fileId} → Size: ${chunkSize} bytes`);
+
             // ✅ Ack back immediately
             connection.send({
                 type: "ack",
@@ -22,7 +26,7 @@ export const useFileReceiver = () => {
                 chunkIndex,
             });
 
-            console.log(`⬅️ Received chunk #${chunkIndex} for file ID: ${fileId} → Ack sent`);
+            console.log(`✅ Ack sent for chunk #${chunkIndex} of file ID: ${fileId}`);
         };
 
         connection.on("data", handleData);

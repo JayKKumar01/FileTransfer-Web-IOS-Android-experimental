@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
@@ -12,13 +12,29 @@ export const useFileSender = (files, updateFile) => {
     const { connection, isConnectionReady } = usePeer();
 
     const currentFileIdRef = useRef(null);
-    const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
+    const currentChunkIndexRef = useRef(0);
     const isSendingRef = useRef(false);
+
+    // -------------------- Helper: Send a chunk --------------------
+    const sendChunk = async (file, chunkIndex) => {
+        const actualFile = file.file;
+        const startByte = chunkIndex * CHUNK_SIZE;
+        const endByte = Math.min(startByte + CHUNK_SIZE, actualFile.size);
+        const chunk = actualFile.slice(startByte, endByte);
+        const data = await chunk.arrayBuffer(); // MUST await
+
+        connection.send({
+            type: "chunk",
+            fileId: file.id,
+            chunkIndex,
+            data,
+        });
+    };
 
     // -------------------- Helper: Start file transfer --------------------
     const startFileTransfer = (file) => {
         currentFileIdRef.current = file.id;
-        setCurrentChunkIndex(0);
+        currentChunkIndexRef.current = 0;
         isSendingRef.current = true;
 
         updateFile(file.id, { state: "sending", progress: 0 });
@@ -27,31 +43,11 @@ export const useFileSender = (files, updateFile) => {
         sendChunk(file, 0);
     };
 
-    // -------------------- Helper: Send a chunk --------------------
-    const sendChunk = (file, chunkIndex) => {
-        console.log(`➡️ Sending chunk #${chunkIndex} for "${file.metadata.name}"`);
-
-        // Placeholder for now (later: slice → ArrayBuffer → send)
-        connection.send({
-            type: "chunk",
-            fileId: file.id,
-            chunkIndex,
-            data: "PLACEHOLDER",
-        });
-    };
-
     // -------------------- Handle ACK → send next --------------------
     const processAck = (ack) => {
-        if (ack.fileId !== currentFileIdRef.current) {
-            console.log("Not the current file, ignoring ack:", ack);
-            console.log("Current file:", currentFileIdRef.current);
-            console.log("Ack file:", ack.fileId);
-            return;
-        }
+        if (ack.fileId !== currentFileIdRef.current) return;
 
-        console.log(`✅ Ack for file ${ack.fileId}, chunk #${ack.chunkIndex}`);
-
-        const file = files.find((f) => f.id === ack.fileId);
+        const file = files.find(f => f.id === ack.fileId);
         if (!file) return;
 
         const nextChunk = ack.chunkIndex + 1;
@@ -59,7 +55,7 @@ export const useFileSender = (files, updateFile) => {
         const isLastChunk = bytesSent >= file.metadata.size;
 
         if (!isLastChunk) {
-            setCurrentChunkIndex(nextChunk);
+            currentChunkIndexRef.current = nextChunk;
             sendChunk(file, nextChunk);
             updateFile(file.id, { progress: bytesSent });
         } else {
@@ -67,7 +63,7 @@ export const useFileSender = (files, updateFile) => {
             updateFile(file.id, { state: "completed", progress: file.metadata.size });
 
             currentFileIdRef.current = null;
-            setCurrentChunkIndex(0);
+            currentChunkIndexRef.current = 0;
             isSendingRef.current = false;
         }
     };
@@ -76,10 +72,8 @@ export const useFileSender = (files, updateFile) => {
     useEffect(() => {
         if (!isConnectionReady || isSendingRef.current) return;
 
-        const nextFile = files.find((f) => f.status.state === "pending");
-        if (nextFile) {
-            startFileTransfer(nextFile);
-        }
+        const nextFile = files.find(f => f.status.state === "pending");
+        if (nextFile) startFileTransfer(nextFile);
     }, [files, isConnectionReady]);
 
     // -------------------- Effect 2: Handle incoming ACK --------------------
@@ -87,12 +81,10 @@ export const useFileSender = (files, updateFile) => {
         if (!connection) return;
 
         const handleData = (data) => {
-            if (data.type === "ack") {
-                processAck(data);
-            }
+            if (data.type === "ack") processAck(data);
         };
 
         connection.on("data", handleData);
         return () => connection.off("data", handleData);
-    }, [connection, files, currentChunkIndex]);
+    }, [connection, files]);
 };

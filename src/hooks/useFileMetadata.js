@@ -1,14 +1,14 @@
 import { useEffect } from "react";
 import { usePeer } from "../contexts/PeerContext";
+import { useContext } from "react";
+import { TabContext } from "../contexts/TabContext";
 
 /**
  * Hook to handle sending and receiving file metadata.
- * @param {Array} files - Current list of files from FileContext
- * @param {Function} updateFile - Update file helper from FileContext
- * @param {Function} addDownloads - Add multiple downloads at once
  */
 export const useFileMetadata = (files, updateFile, addDownloads) => {
     const { connection, isConnectionReady } = usePeer();
+    const { setActiveTab } = useContext(TabContext); // access TabBar state
 
     // -------------------- Send Metadata --------------------
     useEffect(() => {
@@ -24,7 +24,6 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
             }));
 
             connection.send({ type: "metadata", payload });
-
             unsentFiles.forEach(file => updateFile(file.id, { metaSent: true }));
 
             console.log(
@@ -55,9 +54,14 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
                 `📥 Received metadata for ${downloadsToAdd.length} file(s):`,
                 downloadsToAdd.map(d => `"${d.metadata.name}" (ID: ${d.id}, Size: ${d.metadata.size}, Type: ${d.metadata.type})`)
             );
+
+            // -------------------- Switch Tab --------------------
+            if (downloadsToAdd.length > 0) {
+                setActiveTab("RECEIVE"); // TabBar will handle navigation
+            }
         };
 
         connection.on("data", handleData);
         return () => connection.off("data", handleData);
-    }, [connection, addDownloads]);
+    }, [connection, addDownloads, setActiveTab]);
 };

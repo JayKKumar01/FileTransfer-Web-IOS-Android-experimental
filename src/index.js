@@ -5,6 +5,7 @@ import { HashRouter } from "react-router-dom";
 import App from "./App";
 import { LogProvider } from "./contexts/LogContext";
 import { PeerProvider } from "./contexts/PeerContext";
+import { TabProvider } from "./contexts/TabContext"; // ✅ import TabProvider
 import { FileProvider } from "./contexts/FileContext";
 import reportWebVitals from "./reportWebVitals";
 import "./index.css";
@@ -15,9 +16,11 @@ root.render(
         <HashRouter>
             <LogProvider>
                 <PeerProvider>
-                    <FileProvider>
-                        <App />
-                    </FileProvider>
+                    <TabProvider> {/* ✅ TabProvider wraps FileProvider */}
+                        <FileProvider>
+                            <App />
+                        </FileProvider>
+                    </TabProvider>
                 </PeerProvider>
             </LogProvider>
         </HashRouter>

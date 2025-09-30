@@ -9,7 +9,7 @@
 
 /**
  * @typedef {Object} DownloadStatus
- * @property {"pending"|"receiving"|"completed"|"failed"} state - Current transfer state
+ * @property {"pending"|"receiving"|"received"|"failed"} state - Current transfer state
  * @property {number} progress - Bytes received so far
  * @property {string} [error] - Optional error message if transfer failed
  */

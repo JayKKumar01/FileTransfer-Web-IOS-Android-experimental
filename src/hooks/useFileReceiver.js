@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
-import { initBufferRefs, pushChunk, finalizeFile } from "../utils/fileReceiverUtil";
+import { initFile, pushChunk, finalizeFile } from "../utils/fileReceiverUtil";
 
 /**
  * Hook to handle receiving file chunks, updating progress, speed, and completion.
@@ -18,18 +18,16 @@ export const useFileReceiver = (downloads, updateDownload) => {
     const UPS = 6;
     const UI_UPDATE_INTERVAL = 1000 / UPS;
 
-    const initRefs = (fileId) => {
+    // Initialize tracking refs and util
+    const initRefs = (fileId, fileName, mimeType) => {
         if (!bytesReceivedRef.current[fileId]) bytesReceivedRef.current[fileId] = 0;
         if (!speedRef.current[fileId]) {
-            speedRef.current[fileId] = {
-                lastBytes: 0,
-                lastTime: performance.now(),
-            };
+            speedRef.current[fileId] = { lastBytes: 0, lastTime: performance.now() };
         }
         if (!uiThrottleRef.current[fileId]) uiThrottleRef.current[fileId] = 0;
 
-        // Initialize buffer in util
-        initBufferRefs(fileId);
+        // Initialize file in util (buffer or StreamSaver)
+        initFile(fileId, fileName, mimeType);
     };
 
     const sendAck = (fileId, chunkIndex) => {
@@ -45,13 +43,8 @@ export const useFileReceiver = (downloads, updateDownload) => {
         const deltaTime = (now - speedRef.current[fileId].lastTime) / 1000;
         let speed = 0;
         if (deltaTime > 0) {
-            speed =
-                (bytesReceivedRef.current[fileId] -
-                    speedRef.current[fileId].lastBytes) / deltaTime;
-            speedRef.current[fileId] = {
-                lastBytes: bytesReceivedRef.current[fileId],
-                lastTime: now,
-            };
+            speed = (bytesReceivedRef.current[fileId] - speedRef.current[fileId].lastBytes) / deltaTime;
+            speedRef.current[fileId] = { lastBytes: bytesReceivedRef.current[fileId], lastTime: now };
         }
         return speed;
     };
@@ -74,7 +67,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
             updateDownload(fileId, {
                 progress: download.metadata.size,
                 speed: 0,
-                state: "completed",
+                state: "received",
             });
 
             // Finalize download using util
@@ -84,7 +77,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
 
     // Sync downloads into map
     useEffect(() => {
-        downloadMapRef.current = Object.fromEntries(downloads.map((d) => [d.id, d]));
+        downloadMapRef.current = Object.fromEntries(downloads.map(d => [d.id, d]));
     }, [downloads]);
 
     // Handle incoming data
@@ -100,7 +93,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
             if (!download) return;
 
             sendAck(fileId, chunkIndex);
-            initRefs(fileId);
+            initRefs(fileId, download.metadata.name, download.metadata.type);
 
             if (chunk) {
                 updateBytesReceived(fileId, chunk.byteLength);
@@ -110,6 +103,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
             const speed = calculateSpeed(fileId);
             throttleUIUpdate(fileId, speed);
             await checkCompletion(fileId); // Check completion + finalize
+
             data.data = null; // free memory
         };
 

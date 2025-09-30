@@ -1,56 +1,69 @@
-// fileReceiverUtil.js
+import streamSaver from "streamsaver";
 
-// Store buffers and blob parts per file
+// -------------------- Platform Detection --------------------
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// -------------------- iOS Buffers --------------------
+const BUFFER_THRESHOLD = 2 * 1024 * 1024; // 2 MB
 const bufferMap = {};
 const bufferOffsetMap = {};
 const blobPartsMap = {};
 
-// Platform-specific buffer threshold
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-const BUFFER_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024; // 2MB / 8MB
+// -------------------- Non-iOS Writers --------------------
+const writerMap = {};
 
-/**
- * Initialize buffer for a file
- */
-export function initBufferRefs(fileId) {
+// -------------------- iOS Helpers --------------------
+async function iosInit(fileId) {
     if (!bufferMap[fileId]) bufferMap[fileId] = new Uint8Array(BUFFER_THRESHOLD);
     if (!bufferOffsetMap[fileId]) bufferOffsetMap[fileId] = 0;
     if (!blobPartsMap[fileId]) blobPartsMap[fileId] = [];
 }
 
-/**
- * Push a chunk into buffer and flush if threshold is reached
- */
-export async function pushChunk(fileId, chunk) {
-    initBufferRefs(fileId);
+async function iosPushChunk(fileId, chunk) {
+    let offset = bufferOffsetMap[fileId];
+    let remaining = new Uint8Array(chunk);
 
-    const offset = bufferOffsetMap[fileId];
-    bufferMap[fileId].set(new Uint8Array(chunk), offset);
-    bufferOffsetMap[fileId] += chunk.byteLength;
+    while (remaining.length > 0) {
+        const spaceLeft = BUFFER_THRESHOLD - offset;
 
-    if (bufferOffsetMap[fileId] >= BUFFER_THRESHOLD) {
-        await flushBuffer(fileId);
+        if (remaining.length <= spaceLeft) {
+            bufferMap[fileId].set(remaining, offset);
+            bufferOffsetMap[fileId] += remaining.length;
+
+            if (bufferOffsetMap[fileId] >= BUFFER_THRESHOLD) {
+                await iosFlush(fileId);
+            }
+            break;
+        } else {
+            console.log(
+                "Chunk too large for iOS buffer, splitting:",
+                remaining.length,
+                ">", BUFFER_THRESHOLD, "=", spaceLeft
+            );
+
+            const first = remaining.slice(0, spaceLeft);
+            const second = remaining.slice(spaceLeft);
+
+            bufferMap[fileId].set(first, offset);
+            await iosFlush(fileId);
+
+            remaining = second;
+            offset = 0;
+        }
     }
 }
 
-/**
- * Flush buffer into blob parts
- */
-export async function flushBuffer(fileId) {
+async function iosFlush(fileId) {
     const offset = bufferOffsetMap[fileId];
     if (!offset) return;
 
     const blob = new Blob([bufferMap[fileId].slice(0, offset)]);
     blobPartsMap[fileId].push(blob);
-
     bufferOffsetMap[fileId] = 0;
 }
 
-/**
- * Finalize file into a Blob
- */
-export async function finalizeFile(fileId, fileName, mimeType = "application/octet-stream") {
-    await flushBuffer(fileId);
+async function iosFinalize(fileId, fileName, mimeType) {
+    await iosFlush(fileId);
 
     const blob = new Blob(blobPartsMap[fileId], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -62,8 +75,45 @@ export async function finalizeFile(fileId, fileName, mimeType = "application/oct
 
     URL.revokeObjectURL(url);
 
-    // cleanup
     delete bufferMap[fileId];
     delete bufferOffsetMap[fileId];
     delete blobPartsMap[fileId];
+}
+
+// -------------------- Non-iOS Helpers --------------------
+function nonIosInit(fileId, fileName, mimeType) {
+    if (!writerMap[fileId]) {
+        const fileStream = streamSaver.createWriteStream(fileName, { size: 0, mimeType });
+        writerMap[fileId] = fileStream.getWriter();
+    }
+}
+
+async function nonIosPushChunk(fileId, chunk) {
+    const writer = writerMap[fileId];
+    if (writer) await writer.write(new Uint8Array(chunk));
+}
+
+async function nonIosFinalize(fileId) {
+    const writer = writerMap[fileId];
+    if (writer) {
+        await writer.close();
+        delete writerMap[fileId];
+    }
+}
+
+// -------------------- Public API --------------------
+export function initFile(fileId, fileName, mimeType = "application/octet-stream") {
+    return isIOS ? iosInit(fileId) : nonIosInit(fileId, fileName, mimeType);
+}
+
+export function pushChunk(fileId, chunk) {
+    return isIOS ? iosPushChunk(fileId, chunk) : nonIosPushChunk(fileId, chunk);
+}
+
+export function flushBuffer(fileId) {
+    return isIOS ? iosFlush(fileId) : Promise.resolve();
+}
+
+export function finalizeFile(fileId, fileName, mimeType = "application/octet-stream") {
+    return isIOS ? iosFinalize(fileId, fileName, mimeType) : nonIosFinalize(fileId);
 }

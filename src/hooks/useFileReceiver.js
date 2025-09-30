@@ -3,8 +3,7 @@ import { usePeer } from "../contexts/PeerContext";
 
 /**
  * Hook to handle receiving file chunks, updating progress, speed, and completion.
- * @param {DownloadItem[]} downloads - Current download list from FileContext
- * @param {(id: string, updates: Partial<DownloadStatus>) => void} updateDownload - Update helper
+ * Works on mobile Safari / Chrome by incrementally creating a Blob.
  */
 export const useFileReceiver = (downloads, updateDownload) => {
     const { connection } = usePeer();
@@ -13,15 +12,16 @@ export const useFileReceiver = (downloads, updateDownload) => {
     const speedRef = useRef({});
     const uiThrottleRef = useRef({});
     const downloadMapRef = useRef({});
+    const blobPartsRef = useRef({}); // store chunk arrays per file
 
     const UPS = 6;
     const UI_UPDATE_INTERVAL = 1000 / UPS;
 
-    // -------------------- Utility Methods --------------------
     const initRefs = (fileId) => {
         if (!bytesReceivedRef.current[fileId]) bytesReceivedRef.current[fileId] = 0;
         if (!speedRef.current[fileId]) speedRef.current[fileId] = { lastBytes: 0, lastTime: performance.now() };
         if (!uiThrottleRef.current[fileId]) uiThrottleRef.current[fileId] = 0;
+        if (!blobPartsRef.current[fileId]) blobPartsRef.current[fileId] = [];
     };
 
     const sendAck = (fileId, chunkIndex) => {
@@ -55,6 +55,27 @@ export const useFileReceiver = (downloads, updateDownload) => {
         }
     };
 
+    const finalizeFile = (fileId) => {
+        const download = downloadMapRef.current[fileId];
+        if (!download) return;
+
+        const blob = new Blob(blobPartsRef.current[fileId] || [], { type: download.metadata.type || "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = download.metadata.name;
+        a.click();
+
+        URL.revokeObjectURL(url);
+        console.log(`🎉 Download completed: "${download.metadata.name}" (ID: ${fileId})`);
+
+        delete bytesReceivedRef.current[fileId];
+        delete speedRef.current[fileId];
+        delete uiThrottleRef.current[fileId];
+        delete blobPartsRef.current[fileId];
+    };
+
     const checkCompletion = (fileId) => {
         const download = downloadMapRef.current[fileId];
         if (download && bytesReceivedRef.current[fileId] >= download.metadata.size) {
@@ -65,20 +86,14 @@ export const useFileReceiver = (downloads, updateDownload) => {
                 state: "completed",
             });
 
-            delete bytesReceivedRef.current[fileId];
-            delete speedRef.current[fileId];
-            delete uiThrottleRef.current[fileId];
-
-            console.log(`🎉 Download completed: "${download.metadata.name}" (ID: ${fileId})`);
+            finalizeFile(fileId);
         }
     };
 
-    // -------------------- Update download map --------------------
     useEffect(() => {
         downloadMapRef.current = Object.fromEntries(downloads.map(d => [d.id, d]));
     }, [downloads]);
 
-    // -------------------- Handle incoming chunks --------------------
     useEffect(() => {
         if (!connection) return;
 
@@ -86,26 +101,23 @@ export const useFileReceiver = (downloads, updateDownload) => {
             if (data.type !== "chunk") return;
 
             const { fileId, chunkIndex } = data;
-            const chunkSize = data.data?.byteLength || 0;
-
-            // Immediate ACK
             sendAck(fileId, chunkIndex);
 
-            // Initialize refs
+            const chunk = data.data;
+
             initRefs(fileId);
 
-            // Update bytes & speed
-            updateBytesReceived(fileId, chunkSize);
+            // Append chunk for incremental Blob creation
+            if (chunk) {
+                blobPartsRef.current[fileId].push(new Blob([chunk]));
+                updateBytesReceived(fileId, chunk.byteLength || 0);
+            }
+
             const speed = calculateSpeed(fileId);
-
-            // Throttle UI update
             throttleUIUpdate(fileId, speed);
-
-            // Check completion
             checkCompletion(fileId);
 
-            // Free memory
-            data.data = null;
+            data.data = null; // free memory
         };
 
         connection.on("data", handleData);

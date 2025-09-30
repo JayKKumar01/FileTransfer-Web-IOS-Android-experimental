@@ -3,7 +3,7 @@ import { usePeer } from "../contexts/PeerContext";
 
 /**
  * Hook to handle receiving file chunks, updating progress, speed, and completion.
- * Works on mobile Safari / Chrome by incrementally creating a Blob.
+ * Optimized: uses a single large Uint8Array buffer per file and flushes to Blob at threshold.
  */
 export const useFileReceiver = (downloads, updateDownload) => {
     const { connection } = usePeer();
@@ -12,15 +12,23 @@ export const useFileReceiver = (downloads, updateDownload) => {
     const speedRef = useRef({});
     const uiThrottleRef = useRef({});
     const downloadMapRef = useRef({});
-    const blobPartsRef = useRef({}); // store chunk arrays per file
+    const bufferRef = useRef({});     // large Uint8Array per file
+    const bufferOffsetRef = useRef({}); // current write offset
+    const blobPartsRef = useRef({});  // finalized blobs
 
     const UPS = 6;
     const UI_UPDATE_INTERVAL = 1000 / UPS;
 
-    const initRefs = (fileId) => {
+    // Platform-specific buffer threshold
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const BUFFER_THRESHOLD = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024; // 2MB / 8MB
+
+    const initRefs = (fileId, totalSize) => {
         if (!bytesReceivedRef.current[fileId]) bytesReceivedRef.current[fileId] = 0;
         if (!speedRef.current[fileId]) speedRef.current[fileId] = { lastBytes: 0, lastTime: performance.now() };
         if (!uiThrottleRef.current[fileId]) uiThrottleRef.current[fileId] = 0;
+        if (!bufferRef.current[fileId]) bufferRef.current[fileId] = new Uint8Array(BUFFER_THRESHOLD);
+        if (!bufferOffsetRef.current[fileId]) bufferOffsetRef.current[fileId] = 0;
         if (!blobPartsRef.current[fileId]) blobPartsRef.current[fileId] = [];
     };
 
@@ -55,11 +63,24 @@ export const useFileReceiver = (downloads, updateDownload) => {
         }
     };
 
+    const flushBuffer = (fileId) => {
+        const offset = bufferOffsetRef.current[fileId];
+        if (offset === 0) return;
+
+        // Slice the used portion and push as Blob
+        const blob = new Blob([bufferRef.current[fileId].slice(0, offset)]);
+        blobPartsRef.current[fileId].push(blob);
+
+        // Reset buffer offset
+        bufferOffsetRef.current[fileId] = 0;
+    };
+
     const finalizeFile = (fileId) => {
+        flushBuffer(fileId);
         const download = downloadMapRef.current[fileId];
         if (!download) return;
 
-        const blob = new Blob(blobPartsRef.current[fileId] || [], { type: download.metadata.type || "application/octet-stream" });
+        const blob = new Blob(blobPartsRef.current[fileId], { type: download.metadata.type || "application/octet-stream" });
         const url = URL.createObjectURL(blob);
 
         const a = document.createElement("a");
@@ -70,9 +91,12 @@ export const useFileReceiver = (downloads, updateDownload) => {
         URL.revokeObjectURL(url);
         console.log(`🎉 Download completed: "${download.metadata.name}" (ID: ${fileId})`);
 
+        // Cleanup
         delete bytesReceivedRef.current[fileId];
         delete speedRef.current[fileId];
         delete uiThrottleRef.current[fileId];
+        delete bufferRef.current[fileId];
+        delete bufferOffsetRef.current[fileId];
         delete blobPartsRef.current[fileId];
     };
 
@@ -85,7 +109,6 @@ export const useFileReceiver = (downloads, updateDownload) => {
                 speed,
                 state: "completed",
             });
-
             finalizeFile(fileId);
         }
     };
@@ -101,16 +124,22 @@ export const useFileReceiver = (downloads, updateDownload) => {
             if (data.type !== "chunk") return;
 
             const { fileId, chunkIndex } = data;
-            sendAck(fileId, chunkIndex);
-
             const chunk = data.data;
+            const download = downloadMapRef.current[fileId];
+            if (!download) return;
 
-            initRefs(fileId);
+            sendAck(fileId, chunkIndex);
+            initRefs(fileId, download.metadata.size);
 
-            // Append chunk for incremental Blob creation
             if (chunk) {
-                blobPartsRef.current[fileId].push(new Blob([chunk]));
-                updateBytesReceived(fileId, chunk.byteLength || 0);
+                // Append chunk to buffer
+                const offset = bufferOffsetRef.current[fileId];
+                bufferRef.current[fileId].set(new Uint8Array(chunk), offset);
+                bufferOffsetRef.current[fileId] += chunk.byteLength;
+                updateBytesReceived(fileId, chunk.byteLength);
+
+                // Flush buffer if threshold reached
+                if (bufferOffsetRef.current[fileId] >= BUFFER_THRESHOLD) flushBuffer(fileId);
             }
 
             const speed = calculateSpeed(fileId);

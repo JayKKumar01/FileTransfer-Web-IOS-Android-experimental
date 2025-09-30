@@ -89,15 +89,15 @@ function App() {
 
             {showTabBar && <TabBar />}
 
-            <footer className="App-footer">
-                <textarea
-                    ref={logRef}
-                    readOnly
-                    className="App-log"
-                    value={logMessages.join("\n")}
-                    placeholder="Logs will appear here..."
-                />
-            </footer>
+            {/*<footer className="App-footer">*/}
+            {/*    <textarea*/}
+            {/*        ref={logRef}*/}
+            {/*        readOnly*/}
+            {/*        className="App-log"*/}
+            {/*        value={logMessages.join("\n")}*/}
+            {/*        placeholder="Logs will appear here..."*/}
+            {/*    />*/}
+            {/*</footer>*/}
         </div>
     );
 }
@@ -107,3 +107,5 @@ export default App;
 
 //if one file then download that directly using url object, if multiple then zip, if android then mulitple downloads
 //all using the database, clear the db at end, but keep clearing as the files are added to zip for ios or downlaoded for android
+//reconnect, even when connection is closed, mark who entered targetId to connect
+// download does not start instantly so for non ios, use streamsaver api

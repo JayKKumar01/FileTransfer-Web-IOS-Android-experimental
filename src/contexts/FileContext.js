@@ -70,7 +70,7 @@ export const FileProvider = ({ children }) => {
     // -------------------- Metadata Hook --------------------
     useFileMetadata(files, updateFile, addDownloads);
     useFileSender(files, updateFile);                 // send file chunks
-    useFileReceiver();                                // receive chunks + ack
+    useFileReceiver(downloads, updateDownload);
 
     return (
         <FileContext.Provider

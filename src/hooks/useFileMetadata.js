@@ -46,7 +46,7 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
             const downloadsToAdd = data.payload.map(f => ({
                 id: f.id,
                 metadata: f.metadata,
-                status: { state: "pending", progress: 0 },
+                status: { state: "pending", progress: 0, speed: 0 },
             }));
 
             addDownloads(downloadsToAdd);

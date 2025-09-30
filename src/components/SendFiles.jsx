@@ -20,7 +20,7 @@ const SendFileItem = memo(({ file, refProp }) => {
     // Dynamic status: show speed if sending
     const statusText =
         file.status.state === "sending"
-            ? `sending (${formatSpeed(file.status.speed)})`
+            ? `${formatSpeed(file.status.speed)}`
             : file.status.state;
 
     return (

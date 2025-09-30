@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
+import { initBufferRefs, pushChunk, finalizeFile } from "../utils/fileReceiverUtil";
 
 /**
  * Hook to handle receiving file chunks, updating progress, speed, and completion.
- * Only keeps UI/tracking logic. Download/buffer logic will be moved out.
+ * UI/tracking logic stays in hook, buffering and download handled in util.
  */
 export const useFileReceiver = (downloads, updateDownload) => {
     const { connection } = usePeer();
@@ -26,6 +27,9 @@ export const useFileReceiver = (downloads, updateDownload) => {
             };
         }
         if (!uiThrottleRef.current[fileId]) uiThrottleRef.current[fileId] = 0;
+
+        // Initialize buffer in util
+        initBufferRefs(fileId);
     };
 
     const sendAck = (fileId, chunkIndex) => {
@@ -64,16 +68,17 @@ export const useFileReceiver = (downloads, updateDownload) => {
         }
     };
 
-    const checkCompletion = (fileId) => {
+    const checkCompletion = async (fileId) => {
         const download = downloadMapRef.current[fileId];
         if (download && bytesReceivedRef.current[fileId] >= download.metadata.size) {
-            const speed = calculateSpeed(fileId);
             updateDownload(fileId, {
                 progress: download.metadata.size,
-                speed,
+                speed: 0,
                 state: "completed",
             });
-            // Finalization will be handled in util
+
+            // Finalize download using util
+            await finalizeFile(fileId, download.metadata.name, download.metadata.type);
         }
     };
 
@@ -86,7 +91,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
     useEffect(() => {
         if (!connection) return;
 
-        const handleData = (data) => {
+        const handleData = async (data) => {
             if (data.type !== "chunk") return;
 
             const { fileId, chunkIndex } = data;
@@ -99,13 +104,12 @@ export const useFileReceiver = (downloads, updateDownload) => {
 
             if (chunk) {
                 updateBytesReceived(fileId, chunk.byteLength);
-                // Buffering/flushing handled in util
+                await pushChunk(fileId, chunk); // Send chunk to util
             }
 
             const speed = calculateSpeed(fileId);
             throttleUIUpdate(fileId, speed);
-            checkCompletion(fileId);
-
+            await checkCompletion(fileId); // Check completion + finalize
             data.data = null; // free memory
         };
 

@@ -1,4 +1,5 @@
-import streamSaver from "streamsaver";
+// fileReceiverUtil.js (optimized)
+import { createWriteStream, writeChunk, finalizeFile as finalizeStream } from "../libs/nonIosFileSaver";
 
 // -------------------- Platform Detection --------------------
 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -9,8 +10,9 @@ const bufferMap = {};
 const bufferOffsetMap = {};
 const blobPartsMap = {};
 
+
 // -------------------- Non-iOS Writers --------------------
-const writerMap = {};
+const writerMap = {}; // <-- fixed
 
 // -------------------- iOS Helpers --------------------
 async function iosInit(fileId) {
@@ -77,20 +79,21 @@ async function iosFinalize(fileId, fileName, mimeType = "application/octet-strea
 // -------------------- Non-iOS Helpers --------------------
 function nonIosInit(fileId, fileName, mimeType = "application/octet-stream") {
     if (!writerMap[fileId]) {
-        const fileStream = streamSaver.createWriteStream(fileName, { size: 0, mimeType });
-        writerMap[fileId] = fileStream.getWriter();
+        // create a writable stream using our own optimized lib
+        writerMap[fileId] = createWriteStream(fileId, fileName, mimeType);
     }
 }
 
 async function nonIosPushChunk(fileId, chunk) {
+    if (!chunk) return;
     const writer = writerMap[fileId];
-    if (writer && chunk) await writer.write(new Uint8Array(chunk));
+    if (writer) await writeChunk(fileId, chunk);
 }
 
 async function nonIosFinalize(fileId) {
     const writer = writerMap[fileId];
     if (writer) {
-        await writer.close();
+        await finalizeStream(fileId);
         delete writerMap[fileId];
     }
 }

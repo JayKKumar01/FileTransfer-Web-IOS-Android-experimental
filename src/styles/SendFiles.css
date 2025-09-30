@@ -95,13 +95,14 @@
     overflow: hidden;
 }
 
-.progress-fill {
+.progress-fill-send {
     height: 100%;
     width: 0%;
-    background-color: #f39c12;
+    background-color: #f39c12; /* Orange for sending */
     border-radius: 4px;
     transition: width 0.2s ease;
 }
+
 
 /* Back button */
 .back-button {

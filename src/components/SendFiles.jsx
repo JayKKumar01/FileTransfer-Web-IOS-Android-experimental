@@ -37,7 +37,7 @@ const SendFileItem = memo(({ file, refProp }) => {
             <div className="file-row progress-bar-row">
                 <div className="progress-bar">
                     <div
-                        className="progress-fill"
+                        className="progress-fill-send"
                         style={{ width: `${progressPercent}%` }}
                     />
                 </div>

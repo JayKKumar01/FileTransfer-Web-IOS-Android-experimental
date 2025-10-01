@@ -97,3 +97,5 @@ export default App;
 //reconnect, even when connection is closed, mark who entered targetId to connect
 // download does not start instantly so for non ios, use streamsaver api
 // check if conn.send is slow on android for 256 kb, or not, check ios only to get result
+// reconnect is pending too
+

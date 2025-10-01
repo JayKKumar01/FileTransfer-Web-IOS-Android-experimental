@@ -89,15 +89,15 @@ function App() {
 
             {showTabBar && <TabBar />}
 
-            {/*<footer className="App-footer">*/}
-            {/*    <textarea*/}
-            {/*        ref={logRef}*/}
-            {/*        readOnly*/}
-            {/*        className="App-log"*/}
-            {/*        value={logMessages.join("\n")}*/}
-            {/*        placeholder="Logs will appear here..."*/}
-            {/*    />*/}
-            {/*</footer>*/}
+            <footer className="App-footer">
+                <textarea
+                    ref={logRef}
+                    readOnly
+                    className="App-log"
+                    value={logMessages.join("\n")}
+                    placeholder="Logs will appear here..."
+                />
+            </footer>
         </div>
     );
 }

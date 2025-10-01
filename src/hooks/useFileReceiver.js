@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
-import { initFile, pushChunk, finalizeFile } from "../utils/fileReceiverUtil";
+import {useFileTransfer} from "../utils/fileReceiverUtil";
 
 /**
  * Hook to handle receiving file chunks, updating progress, speed, and completion.
@@ -8,6 +8,8 @@ import { initFile, pushChunk, finalizeFile } from "../utils/fileReceiverUtil";
  */
 export const useFileReceiver = (downloads, updateDownload) => {
     const { connection } = usePeer();
+    const { initFile, pushChunk, finalizeFile } = useFileTransfer();
+
 
     // Tracking/UI refs
     const bytesReceivedRef = useRef({});

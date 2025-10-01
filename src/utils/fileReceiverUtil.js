@@ -3,16 +3,16 @@ import streamSaver from "streamsaver";
 import { LogContext } from "../contexts/LogContext";
 import { isApple } from "./osUtil";
 
-// -------------------- iOS Buffers --------------------
-const IOS_BUFFER_THRESHOLD = 2 * 1024 * 1024; // 2 MB
-const iosBufferMap = {};
-const iosOffsetMap = {};
-const iosBlobPartsMap = {};
-
-// -------------------- Non-iOS Buffers --------------------
+// -------------------- Config --------------------
+const IOS_BUFFER_THRESHOLD = 2 * 1024 * 1024;    // 2 MB
 const NON_IOS_BUFFER_THRESHOLD = 8 * 1024 * 1024; // 8 MB
-const nonIosBufferMap = {};
-const nonIosOffsetMap = {};
+
+// -------------------- Shared Buffers --------------------
+const bufferMap = {};
+const offsetMap = {};
+
+// -------------------- Platform-specific --------------------
+const iosBlobPartsMap = {};
 const writerMap = {};
 
 // -------------------- Hook Wrapper --------------------
@@ -26,25 +26,15 @@ export function useFileTransfer() {
 
     // -------------------- iOS Helpers --------------------
     async function iosInit(fileId) {
-        let initialized = false;
-
-        if (!iosBufferMap[fileId]) {
-            iosBufferMap[fileId] = new Uint8Array(IOS_BUFFER_THRESHOLD);
-            initialized = true;
-        }
-        if (!iosOffsetMap[fileId]) {
-            iosOffsetMap[fileId] = 0;
-            initialized = true;
-        }
         if (!iosBlobPartsMap[fileId]) {
             iosBlobPartsMap[fileId] = [];
-            initialized = true;
-        }
+            bufferMap[fileId] = new Uint8Array(IOS_BUFFER_THRESHOLD);
+            offsetMap[fileId] = 0;
 
-        if (initialized) {
             log(`iOS Init: fileId=${fileId}`);
         }
     }
+
 
 
     async function iosPushChunk(fileId, chunk) {
@@ -52,14 +42,14 @@ export function useFileTransfer() {
         let remaining = new Uint8Array(chunk);
 
         while (remaining.length > 0) {
-            const offset = iosOffsetMap[fileId];
+            const offset = offsetMap[fileId];
             const spaceLeft = IOS_BUFFER_THRESHOLD - offset;
             const toWrite = remaining.subarray(0, spaceLeft);
-            iosBufferMap[fileId].set(toWrite, offset);
-            iosOffsetMap[fileId] += toWrite.length;
+            bufferMap[fileId].set(toWrite, offset);
+            offsetMap[fileId] += toWrite.length;
             remaining = remaining.subarray(toWrite.length);
 
-            if (iosOffsetMap[fileId] >= IOS_BUFFER_THRESHOLD) {
+            if (offsetMap[fileId] >= IOS_BUFFER_THRESHOLD) {
                 await iosFlush(fileId);
             }
         }
@@ -67,12 +57,12 @@ export function useFileTransfer() {
     }
 
     async function iosFlush(fileId) {
-        const offset = iosOffsetMap[fileId];
+        const offset = offsetMap[fileId];
         if (!offset) return;
 
-        const blob = new Blob([iosBufferMap[fileId].slice(0, offset)]);
+        const blob = new Blob([bufferMap[fileId].slice(0, offset)]);
         iosBlobPartsMap[fileId].push(blob);
-        iosOffsetMap[fileId] = 0;
+        offsetMap[fileId] = 0;
         log(`iOS Flush: fileId=${fileId}, parts=${iosBlobPartsMap[fileId].length}`);
     }
 
@@ -81,28 +71,28 @@ export function useFileTransfer() {
         const finalBlob = new Blob(iosBlobPartsMap[fileId], { type: mimeType });
 
         // Cleanup
-        delete iosBufferMap[fileId];
-        delete iosOffsetMap[fileId];
+        delete bufferMap[fileId];
+        delete offsetMap[fileId];
         delete iosBlobPartsMap[fileId];
 
         return finalBlob;
     }
 
     // -------------------- Non-iOS Helpers --------------------
-    function nonIosInit(fileId, fileName, mimeType = "application/octet-stream") {
+    function nonIosInit(fileId, fileName, fileSize, mimeType = "application/octet-stream") {
         if (!writerMap[fileId]) {
-            const fileStream = streamSaver.createWriteStream(fileName, { size: 0, mimeType });
+            const fileStream = streamSaver.createWriteStream(fileName, { size: fileSize, mimeType });
             writerMap[fileId] = fileStream.getWriter();
-            nonIosBufferMap[fileId] = new Uint8Array(NON_IOS_BUFFER_THRESHOLD);
-            nonIosOffsetMap[fileId] = 0;
+            bufferMap[fileId] = new Uint8Array(NON_IOS_BUFFER_THRESHOLD);
+            offsetMap[fileId] = 0;
             log(`Non-iOS Init: fileId=${fileId}, fileName=${fileName}`);
         }
     }
 
     async function nonIosPushChunk(fileId, chunk) {
         if (!chunk) return;
-        const buffer = nonIosBufferMap[fileId];
-        let offset = nonIosOffsetMap[fileId];
+        const buffer = bufferMap[fileId];
+        let offset = offsetMap[fileId];
         let remaining = new Uint8Array(chunk);
 
         while (remaining.length > 0) {
@@ -118,7 +108,7 @@ export function useFileTransfer() {
             }
         }
 
-        nonIosOffsetMap[fileId] = offset;
+        offsetMap[fileId] = offset;
         log(`Non-iOS PushChunk: fileId=${fileId}, size=${chunk.byteLength}`);
     }
 
@@ -134,23 +124,23 @@ export function useFileTransfer() {
         const writer = writerMap[fileId];
         if (!writer) return;
 
-        const offset = nonIosOffsetMap[fileId];
-        if (offset > 0) await nonIosFlush(fileId, nonIosBufferMap[fileId], offset);
+        const offset = offsetMap[fileId];
+        if (offset > 0) await nonIosFlush(fileId, bufferMap[fileId], offset);
 
         await writer.close();
 
         // Cleanup
         delete writerMap[fileId];
-        delete nonIosBufferMap[fileId];
-        delete nonIosOffsetMap[fileId];
+        delete bufferMap[fileId];
+        delete offsetMap[fileId];
 
         log(`Non-iOS Finalize: fileId=${fileId}`);
     }
 
     // -------------------- Public API --------------------
     return {
-        initFile(fileId, fileName, mimeType = "application/octet-stream") {
-            return isApple() ? iosInit(fileId) : nonIosInit(fileId, fileName, mimeType);
+        initFile(fileId, fileName, fileSize, mimeType = "application/octet-stream") {
+            return isApple() ? iosInit(fileId) : nonIosInit(fileId, fileName, fileSize, mimeType);
         },
         pushChunk(fileId, chunk) {
             return isApple() ? iosPushChunk(fileId, chunk) : nonIosPushChunk(fileId, chunk);

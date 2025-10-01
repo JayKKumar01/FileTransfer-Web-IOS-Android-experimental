@@ -13,7 +13,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
     useEffect(() => {
         if (!connection || !downloads?.length) return;
 
-        const handleData = (data) => {
+        const handleData = async (data) => {
             if (!data || data.type !== "chunk") return;
 
             const { fileId, chunkIndex, data: chunk } = data;
@@ -22,6 +22,11 @@ export const useFileReceiver = (downloads, updateDownload) => {
 
             // -------------------- Send ACK --------------------
             connection.send({ type: "ack", fileId, chunkIndex });
+
+            // -------------------- Write chunk to storage --------------------
+            if (chunk && download.storageManager) {
+                await download.storageManager.pushChunk(chunk);
+            }
 
             // -------------------- Update tracking --------------------
             if (chunk) {
@@ -39,10 +44,17 @@ export const useFileReceiver = (downloads, updateDownload) => {
 
             // -------------------- Check completion --------------------
             if (download.trackingManager.isComplete()) {
+                // Finalize storage and get final Blob if iOS
+                let finalBlob;
+                if (download.storageManager) {
+                    finalBlob = await download.storageManager.finalize();
+                }
+
                 updateDownload(fileId, {
-                    progress: download.trackingManager.getTotalSize(),
+                    progress: download.trackingManager.getTotalSize?.() || 0,
                     speed: 0,
                     state: "received",
+                    blob: finalBlob,
                 });
             }
 

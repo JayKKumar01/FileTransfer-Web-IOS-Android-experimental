@@ -4,6 +4,7 @@ import { useContext } from "react";
 import { TabContext } from "../contexts/TabContext";
 import {isApple} from "../utils/osUtil";
 import {createTrackingManager} from "../utils/createTrackingManager";
+import {createStorageManager} from "../utils/createStorageManager";
 
 const IOS_BUFFER_THRESHOLD = 2 * 1024 * 1024;    // 2 MB
 const NON_IOS_BUFFER_THRESHOLD = 8 * 1024 * 1024; // 8 MB
@@ -56,14 +57,7 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
                     blob: null,
                 },
                 trackingManager: createTrackingManager(f.metadata.size),
-                storageManager: {
-                    buffer: isApple()
-                        ? new Uint8Array(IOS_BUFFER_THRESHOLD)
-                        : new Uint8Array(NON_IOS_BUFFER_THRESHOLD),
-                    offset: 0,
-                    iosBlobParts: isApple() ? [] : undefined,
-                    writer: !isApple() ? null : undefined, // will be set later for non-iOS
-                },
+                storageManager: createStorageManager(f.metadata),
             }));
 
 

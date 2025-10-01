@@ -54,6 +54,7 @@ export function createTrackingManager({ totalSize, uiUpdateInterval = 1000 / 6 }
      * Check if download is complete
      */
     function isComplete() {
+        console.log(`Checking if complete: ${bytesReceived} >= ${totalSize}`);
         return bytesReceived >= totalSize;
     }
 

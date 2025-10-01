@@ -44,10 +44,12 @@ export const useFileReceiver = (downloads, updateDownload) => {
 
             // -------------------- Check completion --------------------
             if (download.trackingManager.isComplete()) {
+                console.log("Complete!")
                 // Finalize storage and get final Blob if iOS
                 let finalBlob;
                 if (download.storageManager) {
                     finalBlob = await download.storageManager.finalize();
+                    console.log(finalBlob.size, download.metadata.size);
                 }
 
                 updateDownload(fileId, {

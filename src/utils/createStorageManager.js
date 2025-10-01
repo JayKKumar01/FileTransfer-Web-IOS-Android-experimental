@@ -59,7 +59,7 @@ export function createStorageManager(metadata, log = () => {}) {
             if (offset >= threshold) await flush();
         }
 
-        log(`PushChunk: file=${name}, size=${chunk.byteLength}`);
+        log(`PushChunk: file=${name}, size=${chunk.byteLength}, offset=${offset}`);
     }
 
     async function finalize() {

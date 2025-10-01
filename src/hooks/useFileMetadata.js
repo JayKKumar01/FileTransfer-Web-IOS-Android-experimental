@@ -2,7 +2,11 @@ import { useEffect } from "react";
 import { usePeer } from "../contexts/PeerContext";
 import { useContext } from "react";
 import { TabContext } from "../contexts/TabContext";
+import {isApple} from "../utils/osUtil";
+import {createTrackingManager} from "../utils/createTrackingManager";
 
+const IOS_BUFFER_THRESHOLD = 2 * 1024 * 1024;    // 2 MB
+const NON_IOS_BUFFER_THRESHOLD = 8 * 1024 * 1024; // 8 MB
 /**
  * Hook to handle sending and receiving file metadata.
  */
@@ -45,8 +49,24 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
             const downloadsToAdd = data.payload.map(f => ({
                 id: f.id,
                 metadata: f.metadata,
-                status: { state: "pending", progress: 0, speed: 0 },
+                status: {
+                    state: "pending",
+                    progress: 0,
+                    speed: 0,
+                    blob: null,
+                },
+                trackingManager: createTrackingManager(f.metadata.size),
+                storageManager: {
+                    buffer: isApple()
+                        ? new Uint8Array(IOS_BUFFER_THRESHOLD)
+                        : new Uint8Array(NON_IOS_BUFFER_THRESHOLD),
+                    offset: 0,
+                    iosBlobParts: isApple() ? [] : undefined,
+                    writer: !isApple() ? null : undefined, // will be set later for non-iOS
+                },
             }));
+
+
 
             addDownloads(downloadsToAdd);
 

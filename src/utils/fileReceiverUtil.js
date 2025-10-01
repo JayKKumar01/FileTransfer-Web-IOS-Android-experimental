@@ -36,14 +36,6 @@ async function iosPushChunk(fileId, chunk) {
         if (bufferOffsetMap[fileId] >= BUFFER_THRESHOLD) {
             await iosFlush(fileId);
         }
-
-        if (remaining.length > 0) {
-            console.log(
-                "Chunk too large for iOS buffer, splitting:",
-                toWrite.length + remaining.length,
-                ">", BUFFER_THRESHOLD
-            );
-        }
     }
 }
 
@@ -56,19 +48,79 @@ async function iosFlush(fileId) {
     bufferOffsetMap[fileId] = 0;
 }
 
+// -------------------- Inline Worker --------------------
+let blobWorker;
+
+function ensureBlobWorker() {
+    if (!blobWorker) {
+        const workerCode = `
+        self.onmessage = async (e) => {
+            const { type, fileId, fileName, mimeType, parts } = e.data;
+            if (type === 'finalize') {
+                const totalParts = parts.length;
+                const kept = [];
+
+                for (let i = 0; i < totalParts; i++) {
+                    kept.push(parts[i]);
+
+                    // progress update for *every part*
+                    self.postMessage({
+                        type: 'progress',
+                        phase: 'finalizing',
+                        fileId,
+                        done: i + 1,
+                        total: totalParts,
+                        percent: Math.round(((i + 1) / totalParts) * 100)
+                    });
+
+                    await new Promise(r => setTimeout(r, 0)); // yield to event loop
+                }
+
+                const finalBlob = new Blob(kept, { type: mimeType });
+                self.postMessage({ type: 'done', fileId, fileName, blob: finalBlob });
+            }
+        };
+        `;
+        const blob = new Blob([workerCode], { type: "application/javascript" });
+        const workerUrl = URL.createObjectURL(blob);
+        blobWorker = new Worker(workerUrl);
+
+        blobWorker.onmessage = (e) => {
+            const data = e.data;
+            if (data.type === "progress") {
+                console.log(
+                    `Finalizing ${data.fileId}: ${data.percent}% (${data.done}/${data.total})`
+                );
+                // TODO: update your UI progress bar here
+            } else if (data.type === "done") {
+                const url = URL.createObjectURL(data.blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = data.fileName;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                console.log("Download triggered and blob URL revoked");
+            }
+        };
+    }
+}
+
 async function iosFinalize(fileId, fileName, mimeType = "application/octet-stream") {
     await iosFlush(fileId);
 
-    const blob = new Blob(blobPartsMap[fileId], { type: mimeType });
-    const url = URL.createObjectURL(blob);
+    ensureBlobWorker();
+    const parts = blobPartsMap[fileId];
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
+    blobWorker.postMessage({
+        type: "finalize",
+        fileId,
+        fileName,
+        mimeType,
+        parts
+    });
 
-    URL.revokeObjectURL(url);
-
+    // cleanup maps right away (worker already has references)
     delete bufferMap[fileId];
     delete bufferOffsetMap[fileId];
     delete blobPartsMap[fileId];

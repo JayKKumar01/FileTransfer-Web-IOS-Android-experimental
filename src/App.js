@@ -109,3 +109,4 @@ export default App;
 //all using the database, clear the db at end, but keep clearing as the files are added to zip for ios or downlaoded for android
 //reconnect, even when connection is closed, mark who entered targetId to connect
 // download does not start instantly so for non ios, use streamsaver api
+// check if conn.send is slow on android for 256 kb, or not, check ios only to get result

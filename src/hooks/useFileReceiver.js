@@ -11,7 +11,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
     const UI_UPDATE_INTERVAL = 1000 / 6; // ~6 FPS
 
     useEffect(() => {
-        if (!connection || !downloads?.length) return;
+        if (!connection || !downloads.length) return;
 
         const handleData = async (data) => {
             if (!data || data.type !== "chunk") return;
@@ -24,14 +24,10 @@ export const useFileReceiver = (downloads, updateDownload) => {
             connection.send({ type: "ack", fileId, chunkIndex });
 
             // -------------------- Write chunk to storage --------------------
-            if (chunk && download.storageManager) {
-                await download.storageManager.pushChunk(chunk);
-            }
+            await download.storageManager.pushChunk(chunk);
 
             // -------------------- Update tracking --------------------
-            if (chunk) {
-                download.trackingManager.addBytes(chunk.byteLength);
-            }
+            download.trackingManager.addBytes(chunk.byteLength);
 
             // -------------------- Throttle UI updates --------------------
             if (download.trackingManager.shouldUpdateUI(UI_UPDATE_INTERVAL)) {
@@ -44,16 +40,10 @@ export const useFileReceiver = (downloads, updateDownload) => {
 
             // -------------------- Check completion --------------------
             if (download.trackingManager.isComplete()) {
-                console.log("Complete!")
-                // Finalize storage and get final Blob if iOS
-                let finalBlob;
-                if (download.storageManager) {
-                    finalBlob = await download.storageManager.finalize();
-                    console.log(finalBlob.size, download.metadata.size);
-                }
+                const finalBlob = await download.storageManager.finalize();
 
                 updateDownload(fileId, {
-                    progress: download.trackingManager.getTotalSize?.() || 0,
+                    progress: download.trackingManager.getTotalSize(),
                     speed: 0,
                     state: "received",
                     blob: finalBlob,

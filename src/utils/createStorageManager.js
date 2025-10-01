@@ -26,7 +26,6 @@ export function createStorageManager(metadata, log = () => {}) {
     if (!isApple()) {
         const fileStream = streamSaver.createWriteStream(name, { size, mimeType: type });
         writer = fileStream.getWriter();
-        log(`Non-iOS Init: file=${name}, size=${size}`);
     }
 
     // -------------------- Internal Methods --------------------
@@ -36,11 +35,9 @@ export function createStorageManager(metadata, log = () => {}) {
             const blob = new Blob([buffer.slice(0, offset)]);
             iosBlobParts.push(blob);
             offset = 0;
-            log(`iOS Flush: file=${name}, parts=${iosBlobParts.length}`);
         } else {
             if (!writer || offset === 0) return;
             await writer.write(buffer.slice(0, offset));
-            log(`Non-iOS Flush: file=${name}, flushed=${offset} bytes`);
             offset = 0;
         }
     }
@@ -58,8 +55,6 @@ export function createStorageManager(metadata, log = () => {}) {
 
             if (offset >= threshold) await flush();
         }
-
-        log(`PushChunk: file=${name}, size=${chunk.byteLength}, offset=${offset}`);
     }
 
     async function finalize() {

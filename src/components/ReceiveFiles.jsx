@@ -4,6 +4,9 @@ import { FileContext } from "../contexts/FileContext";
 import { formatFileSize } from "../utils/fileUtil";
 import { Download } from "lucide-react"; // or your preferred icon library
 
+// -------------------- Platform Detection --------------------
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 // -------------------- Memoized Download Item --------------------
 const ReceiveFileItem = memo(({ download, refProp }) => {
     const progressPercent = Math.min(
@@ -37,16 +40,11 @@ const ReceiveFileItem = memo(({ download, refProp }) => {
 
                 <span className="file-status">{statusText}</span>
 
-                <a
+                {isIOS && (<a
                     href={downloadUrl}
                     download={download.metadata.name}
                     className={`download-link ${!hasBlob ? "disabled" : ""}`}
                     title={hasBlob ? "Download" : "Not ready"}
-                    onClick={() => {
-                        if (!hasBlob) return;
-                        // revoke the URL after a short delay to free memory
-                        setTimeout(() => URL.revokeObjectURL(download.status.blob), 1000);
-                    }}
                     style={{
                         marginLeft: "8px",
                         pointerEvents: hasBlob ? "auto" : "none",
@@ -54,7 +52,7 @@ const ReceiveFileItem = memo(({ download, refProp }) => {
                     }}
                 >
                     <Download size={16} />
-                </a>
+                </a>)}
             </div>
 
             <div className="file-row progress-bar-row">

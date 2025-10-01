@@ -4,14 +4,12 @@ import { useContext } from "react";
 import { TabContext } from "../contexts/TabContext";
 import {createTrackingManager} from "../utils/createTrackingManager";
 import {createStorageManager} from "../utils/createStorageManager";
-import {LogContext} from "../contexts/LogContext";
 /**
  * Hook to handle sending and receiving file metadata.
  */
 export const useFileMetadata = (files, updateFile, addDownloads) => {
     const { connection, isConnectionReady } = usePeer();
-    const { setActiveTab } = useContext(TabContext); // access TabBar state
-    const { pushLog } = useContext(LogContext);
+    const { setActiveTab } = useContext(TabContext);
 
     // -------------------- Send Metadata --------------------
     useEffect(() => {
@@ -57,7 +55,6 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
                 trackingManager: createTrackingManager({ totalSize: f.metadata.size }),
                 storageManager: createStorageManager(f.metadata, (msg) => {
                     console.log(msg);       // optional console log
-                    pushLog?.(msg);         // send to your log context if available
                 }),
 
             }));

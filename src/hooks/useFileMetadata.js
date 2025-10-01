@@ -2,18 +2,16 @@ import { useEffect } from "react";
 import { usePeer } from "../contexts/PeerContext";
 import { useContext } from "react";
 import { TabContext } from "../contexts/TabContext";
-import {isApple} from "../utils/osUtil";
 import {createTrackingManager} from "../utils/createTrackingManager";
 import {createStorageManager} from "../utils/createStorageManager";
-
-const IOS_BUFFER_THRESHOLD = 2 * 1024 * 1024;    // 2 MB
-const NON_IOS_BUFFER_THRESHOLD = 8 * 1024 * 1024; // 8 MB
+import {LogContext} from "../contexts/LogContext";
 /**
  * Hook to handle sending and receiving file metadata.
  */
 export const useFileMetadata = (files, updateFile, addDownloads) => {
     const { connection, isConnectionReady } = usePeer();
     const { setActiveTab } = useContext(TabContext); // access TabBar state
+    const { pushLog } = useContext(LogContext);
 
     // -------------------- Send Metadata --------------------
     useEffect(() => {
@@ -57,7 +55,11 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
                     blob: null,
                 },
                 trackingManager: createTrackingManager(f.metadata.size),
-                storageManager: createStorageManager(f.metadata),
+                storageManager: createStorageManager(f.metadata, (msg) => {
+                    console.log(msg);       // optional console log
+                    pushLog?.(msg);         // send to your log context if available
+                }),
+
             }));
 
 

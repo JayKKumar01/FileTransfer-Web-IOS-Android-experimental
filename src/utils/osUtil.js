@@ -1,13 +1,32 @@
-// iOS utility functions
-export const isIOS = () => {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+// Detect any Apple device (iPhone, iPad, iPod, Mac, Apple TV, Watch)
+export const isApple = () => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const platform = navigator.platform || "";
+
+    // iPhone, iPod, iPad
+    if (/iPhone|iPod|iPad/.test(ua)) return true;
+
+    // MacBooks / iMac / Mac Mini / Mac Pro (Intel & Apple Silicon)
+    if (platform.includes("Mac")) return true;
+
+    // Apple TV
+    if (/AppleTV/.test(ua)) return true;
+
+    // Apple Watch
+    if (/Watch/.test(ua)) return true;
+
+    // iPadOS 13+ in desktop mode reports Mac, detect via touch points
+    if (platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+
+    return false;
 };
+
 
 /**
  * Prevent pinch/zoom on iOS
  */
 export const preventPinchZoom = (logCallback) => {
-    if (!isIOS()) return;
+    if (!isApple()) return;
 
     const preventZoom = (e) => {
         if (e.touches.length > 1) e.preventDefault();

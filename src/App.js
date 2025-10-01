@@ -5,26 +5,11 @@ import PeerConnect from "./components/PeerConnect";
 import FileInput from "./components/FileInput";
 import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
-import { preventPinchZoom, setVisibleHeight } from "./utils/osUtil";
+import {isApple, preventPinchZoom, setVisibleHeight} from "./utils/osUtil";
 import { usePeer } from "./contexts/PeerContext";
 import TabBar from "./components/TabBar";
 import SendFiles from "./components/SendFiles";
 import ReceiveFiles from "./components/ReceiveFiles";
-import FileChunkTest from "./old/FileChunkTest";
-import FileSenderTest from "./old/FileSenderTest"; // ✅ test component
-
-// import {deleteDatabase} from "./utils/chunkUtil";
-import FileChunkReader from "./old/FileChunkReader";
-import AndroidChunkSpeedTest from "./old/AndroidChunkSpeedTest";
-import PeerFileBenchmark from "./old/PeerFileBenchmark";
-import IndexedDBFileHandler from "./old/IndexedDBFileHandler";
-import FileStreamSaver from "./old/FileStreamSaver";
-import FakeDownload from "./components/FakeDownload"; // import your delete function
-//
-// // ✅ Delete DB immediately at app start
-// deleteDatabase()
-//     .then(() => console.log("✅ IndexedDB cleared."))
-//     .catch((err) => console.error("❌ Failed to clear DB:", err));
 
 function App() {
     const { logMessages, pushLog } = useContext(LogContext);
@@ -34,6 +19,11 @@ function App() {
     const navigate = useNavigate();
     const location = useLocation();
     const [initialized, setInitialized] = useState(false);
+
+    useEffect(() => {
+        pushLog(isApple() ? "Running on iOS" : "Running on non-iOS");
+    }, []);
+
 
     useEffect(() => {
         const updateHeight = () => setVisibleHeight(pushLog);
@@ -53,10 +43,6 @@ function App() {
         initializePeer();
         setInitialized(true);
         navigate("/connect");
-    };
-
-    const handleTestClick = () => {
-        navigate("/test-chunk");
     };
 
     // Routes where TabBar should be shown
@@ -104,6 +90,7 @@ function App() {
 
 export default App;
 
+// don't delete my comments
 
 //if one file then download that directly using url object, if multiple then zip, if android then mulitple downloads
 //all using the database, clear the db at end, but keep clearing as the files are added to zip for ios or downlaoded for android

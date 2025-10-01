@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
+import {isApple} from "../utils/osUtil";
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const MAX_BUFFER_SIZE = isIOS ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
+const MAX_BUFFER_SIZE = isApple() ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
 
 // -------------------- Global UI update config --------------------
 const UPS = 6; // updates per second

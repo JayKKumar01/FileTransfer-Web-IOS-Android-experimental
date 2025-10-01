@@ -2,10 +2,9 @@ import React, {useContext, memo, useRef, useEffect, useState} from "react";
 import "../styles/ReceiveFiles.css";
 import { FileContext } from "../contexts/FileContext";
 import { formatFileSize } from "../utils/fileUtil";
-import { Download } from "lucide-react"; // or your preferred icon library
+import { Download } from "lucide-react";
+import {isApple} from "../utils/osUtil"; // or your preferred icon library
 
-// -------------------- Platform Detection --------------------
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // -------------------- Memoized Download Item --------------------
 const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
@@ -53,7 +52,7 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
 
                 <span className="file-status">{statusText}</span>
 
-                {isIOS && (
+                {isApple() && (
                     <a
                         href={hasBlob ? URL.createObjectURL(download.status.blob) : undefined}
                         download={download.metadata.name}

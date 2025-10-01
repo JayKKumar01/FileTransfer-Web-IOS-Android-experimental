@@ -1,9 +1,7 @@
 import { useContext } from "react";
 import streamSaver from "streamsaver";
 import { LogContext } from "../contexts/LogContext";
-
-// -------------------- Platform Detection --------------------
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+import {isApple} from "./osUtil";
 
 // -------------------- iOS Buffers --------------------
 const BUFFER_THRESHOLD = 2 * 1024 * 1024; // 2 MB
@@ -104,16 +102,16 @@ export function useFileTransfer() {
     // -------------------- Public API --------------------
     return {
         initFile(fileId, fileName, mimeType = "application/octet-stream") {
-            return isIOS ? iosInit(fileId) : nonIosInit(fileId, fileName, mimeType);
+            return isApple() ? iosInit(fileId) : nonIosInit(fileId, fileName, mimeType);
         },
         pushChunk(fileId, chunk) {
-            return isIOS ? iosPushChunk(fileId, chunk) : nonIosPushChunk(fileId, chunk);
+            return isApple() ? iosPushChunk(fileId, chunk) : nonIosPushChunk(fileId, chunk);
         },
         flushBuffer(fileId) {
-            return isIOS ? iosFlush(fileId) : Promise.resolve();
+            return isApple() ? iosFlush(fileId) : Promise.resolve();
         },
         finalizeFile(fileId, fileName, mimeType = "application/octet-stream") {
-            return isIOS ? iosFinalize(fileId, fileName, mimeType) : nonIosFinalize(fileId);
+            return isApple() ? iosFinalize(fileId, fileName, mimeType) : nonIosFinalize(fileId);
         },
     };
 }

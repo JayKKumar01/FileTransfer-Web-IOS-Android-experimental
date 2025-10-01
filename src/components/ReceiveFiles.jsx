@@ -2,6 +2,7 @@ import React, { useContext, memo, useRef, useEffect } from "react";
 import "../styles/ReceiveFiles.css";
 import { FileContext } from "../contexts/FileContext";
 import { formatFileSize } from "../utils/fileUtil";
+import { Download } from "lucide-react"; // or your preferred icon library
 
 // -------------------- Memoized Download Item --------------------
 const ReceiveFileItem = memo(({ download, refProp }) => {
@@ -10,7 +11,6 @@ const ReceiveFileItem = memo(({ download, refProp }) => {
         100
     ).toFixed(2);
 
-    // Format speed if available
     const formatSpeed = (bytesPerSec) => {
         if (!bytesPerSec || bytesPerSec <= 0) return "";
         return `${formatFileSize(bytesPerSec)}/s`;
@@ -21,17 +21,42 @@ const ReceiveFileItem = memo(({ download, refProp }) => {
             ? `${formatSpeed(download.status.speed)}`
             : download.status.state;
 
+    const hasBlob = Boolean(download.status.blob);
+    const downloadUrl = hasBlob ? URL.createObjectURL(download.status.blob) : undefined;
+
     return (
         <li className="receive-file-item" ref={refProp}>
             <div className="file-row file-name-row">
                 <span className="file-name">{download.metadata.name}</span>
             </div>
+
             <div className="file-row file-progress-row">
                 <span className="file-progress-text">
                     {formatFileSize(download.status.progress)} / {formatFileSize(download.metadata.size)}
                 </span>
+
                 <span className="file-status">{statusText}</span>
+
+                <a
+                    href={downloadUrl}
+                    download={download.metadata.name}
+                    className={`download-link ${!hasBlob ? "disabled" : ""}`}
+                    title={hasBlob ? "Download" : "Not ready"}
+                    onClick={() => {
+                        if (!hasBlob) return;
+                        // revoke the URL after a short delay to free memory
+                        setTimeout(() => URL.revokeObjectURL(download.status.blob), 1000);
+                    }}
+                    style={{
+                        marginLeft: "8px",
+                        pointerEvents: hasBlob ? "auto" : "none",
+                        opacity: hasBlob ? 1 : 0.5,
+                    }}
+                >
+                    <Download size={16} />
+                </a>
             </div>
+
             <div className="file-row progress-bar-row">
                 <div className="progress-bar">
                     <div

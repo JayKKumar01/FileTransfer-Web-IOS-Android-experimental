@@ -10,7 +10,6 @@ export const useFileReceiver = (downloads, updateDownload) => {
     const { connection } = usePeer();
     const { initFile, pushChunk, finalizeFile } = useFileTransfer();
 
-
     // Tracking/UI refs
     const bytesReceivedRef = useRef({});
     const speedRef = useRef({});
@@ -66,16 +65,26 @@ export const useFileReceiver = (downloads, updateDownload) => {
     const checkCompletion = async (fileId) => {
         const download = downloadMapRef.current[fileId];
         if (download && bytesReceivedRef.current[fileId] >= download.metadata.size) {
+
+
+            // Finalize download using util
+            const finalBlob = await finalizeFile(fileId, download.metadata.name, download.metadata.type);
+
+            // Assign the blob to the download item
+            if (finalBlob) {
+                download.blob = finalBlob;
+                console.log("Final blob received: ", finalBlob.type, finalBlob.size);
+            }
+
             updateDownload(fileId, {
                 progress: download.metadata.size,
                 speed: 0,
                 state: "received",
+                blob: finalBlob,
             });
-
-            // Finalize download using util
-            await finalizeFile(fileId, download.metadata.name, download.metadata.type);
         }
     };
+
 
     // Sync downloads into map
     useEffect(() => {

@@ -1,5 +1,3 @@
-// src/interfaces/download.js
-
 /**
  * @typedef {Object} DownloadMetadata
  * @property {string} name - File name
@@ -11,6 +9,7 @@
  * @typedef {Object} DownloadStatus
  * @property {"pending"|"receiving"|"received"|"failed"} state - Current transfer state
  * @property {number} progress - Bytes received so far
+ * @property {Blob} [blob] - Optional: the fully received file as a Blob
  * @property {string} [error] - Optional error message if transfer failed
  */
 

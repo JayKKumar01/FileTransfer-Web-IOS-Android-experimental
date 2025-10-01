@@ -65,7 +65,19 @@ export const FileProvider = ({ children }) => {
             prev.map(d => (d.id === id ? { ...d, status: { ...d.status, ...updates } } : d))
         );
 
-    const removeDownload = (id) => setDownloads(prev => prev.filter(d => d.id !== id));
+    const removeDownload = (id) =>
+        setDownloads((prev) =>
+            prev
+                .map((d) => {
+                    if (d.id === id && d.status.blob) {
+                        // clear the blob reference
+                        d.status.blob = null;
+                    }
+                    return d;
+                })
+                .filter((d) => d.id !== id)
+        );
+
 
     // -------------------- Metadata Hook --------------------
     useFileMetadata(files, updateFile, addDownloads);

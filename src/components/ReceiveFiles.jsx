@@ -8,7 +8,8 @@ import { Download } from "lucide-react"; // or your preferred icon library
 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // -------------------- Memoized Download Item --------------------
-const ReceiveFileItem = memo(({ download, refProp }) => {
+// -------------------- Memoized Download Item --------------------
+const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
     const progressPercent = Math.min(
         (download.status.progress / download.metadata.size) * 100,
         100
@@ -25,7 +26,19 @@ const ReceiveFileItem = memo(({ download, refProp }) => {
             : download.status.state;
 
     const hasBlob = Boolean(download.status.blob);
-    const downloadUrl = hasBlob ? URL.createObjectURL(download.status.blob) : undefined;
+
+    // Handler for click
+    const handleClick = () => {
+        if (!hasBlob) return;
+
+        // Optional: revoke object URL if previously created
+        if (download.status.blob) {
+            URL.revokeObjectURL(download.status.blob);
+        }
+
+        // Remove the download from context
+        onRemove(download.id);
+    };
 
     return (
         <li className="receive-file-item" ref={refProp}>
@@ -40,19 +53,22 @@ const ReceiveFileItem = memo(({ download, refProp }) => {
 
                 <span className="file-status">{statusText}</span>
 
-                {isIOS && (<a
-                    href={downloadUrl}
-                    download={download.metadata.name}
-                    className={`download-link ${!hasBlob ? "disabled" : ""}`}
-                    title={hasBlob ? "Download" : "Not ready"}
-                    style={{
-                        marginLeft: "8px",
-                        pointerEvents: hasBlob ? "auto" : "none",
-                        opacity: hasBlob ? 1 : 0.5,
-                    }}
-                >
-                    <Download size={16} />
-                </a>)}
+                {isIOS && (
+                    <a
+                        href={hasBlob ? URL.createObjectURL(download.status.blob) : undefined}
+                        download={download.metadata.name}
+                        className={`download-link ${!hasBlob ? "disabled" : ""}`}
+                        title={hasBlob ? "Download & Remove" : "Not ready"}
+                        onClick={handleClick}
+                        style={{
+                            marginLeft: "8px",
+                            pointerEvents: hasBlob ? "auto" : "none",
+                            opacity: hasBlob ? 1 : 0.5,
+                        }}
+                    >
+                        <Download size={16} />
+                    </a>
+                )}
             </div>
 
             <div className="file-row progress-bar-row">
@@ -67,9 +83,10 @@ const ReceiveFileItem = memo(({ download, refProp }) => {
     );
 });
 
+
 // -------------------- Main ReceiveFiles Component --------------------
 const ReceiveFiles = () => {
-    const { downloads } = useContext(FileContext);
+    const { downloads, removeDownload } = useContext(FileContext);
     const itemRefs = useRef({});
 
     // Scroll to the first file that is currently receiving
@@ -100,7 +117,9 @@ const ReceiveFiles = () => {
                             key={download.id}
                             download={download}
                             refProp={el => (itemRefs.current[download.id] = el)}
+                            onRemove={removeDownload}
                         />
+
                     ))}
                 </ul>
             </div>

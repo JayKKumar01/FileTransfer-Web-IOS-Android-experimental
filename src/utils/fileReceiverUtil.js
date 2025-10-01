@@ -62,70 +62,17 @@ export function useFileTransfer() {
         log(`iOS Flush: fileId=${fileId}, parts=${blobPartsMap[fileId].length}`);
     }
 
-    // -------------------- Inline Worker --------------------
-    let blobWorker;
-    function ensureBlobWorker() {
-        if (!blobWorker) {
-            const workerCode = `
-        self.onmessage = async (e) => {
-          const { type, fileId, fileName, mimeType, parts } = e.data;
-          if (type === 'finalize') {
-            const totalParts = parts.length;
-            const kept = [];
-
-            for (let i = 0; i < totalParts; i++) {
-              kept.push(parts[i]);
-              self.postMessage({
-                type: 'progress',
-                phase: 'finalizing',
-                fileId,
-                done: i + 1,
-                total: totalParts,
-                percent: Math.round(((i + 1) / totalParts) * 100)
-              });
-              await new Promise(r => setTimeout(r, 0));
-            }
-
-            const finalBlob = new Blob(kept, { type: mimeType });
-            self.postMessage({ type: 'done', fileId, fileName, blob: finalBlob });
-          }
-        };
-      `;
-            const blob = new Blob([workerCode], { type: "application/javascript" });
-            const workerUrl = URL.createObjectURL(blob);
-            blobWorker = new Worker(workerUrl);
-        }
-    }
-
     async function iosFinalize(fileId, fileName, mimeType = "application/octet-stream") {
         await iosFlush(fileId);
-        ensureBlobWorker();
-        const parts = blobPartsMap[fileId];
-        log(`iOS Finalize requested: fileId=${fileId}, parts=${parts.length}`);
 
-        return new Promise((resolve) => {
-            const handleMessage = (e) => {
-                const data = e.data;
-                if (data.fileId !== fileId) return;
+        const finalBlob = new Blob(blobPartsMap[fileId], { type: mimeType });
 
-                if (data.type === "progress") {
-                    log(`Finalizing ${data.fileId}: ${data.percent}% (${data.done}/${data.total})`);
-                } else if (data.type === "done") {
-                    blobWorker.removeEventListener("message", handleMessage);
-                    log(`iOS Finalize completed: ${data.fileName}`);
-                    resolve(data.blob); // return the final Blob
-                }
-            };
+        // Cleanup maps immediately
+        delete bufferMap[fileId];
+        delete bufferOffsetMap[fileId];
+        delete blobPartsMap[fileId];
 
-            blobWorker.addEventListener("message", handleMessage);
-
-            blobWorker.postMessage({ type: "finalize", fileId, fileName, mimeType, parts });
-
-            // Cleanup maps immediately
-            delete bufferMap[fileId];
-            delete bufferOffsetMap[fileId];
-            delete blobPartsMap[fileId];
-        });
+        return finalBlob;
     }
 
     // -------------------- Non-iOS Helpers --------------------

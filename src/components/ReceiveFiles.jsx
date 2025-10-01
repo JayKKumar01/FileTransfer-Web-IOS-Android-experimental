@@ -1,4 +1,4 @@
-import React, { useContext, memo, useRef, useEffect } from "react";
+import React, {useContext, memo, useRef, useEffect, useState} from "react";
 import "../styles/ReceiveFiles.css";
 import { FileContext } from "../contexts/FileContext";
 import { formatFileSize } from "../utils/fileUtil";
@@ -8,17 +8,16 @@ import { Download } from "lucide-react"; // or your preferred icon library
 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // -------------------- Memoized Download Item --------------------
-// -------------------- Memoized Download Item --------------------
 const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
+    const [isRemoving, setIsRemoving] = useState(false);
+
     const progressPercent = Math.min(
         (download.status.progress / download.metadata.size) * 100,
         100
     ).toFixed(2);
 
-    const formatSpeed = (bytesPerSec) => {
-        if (!bytesPerSec || bytesPerSec <= 0) return "";
-        return `${formatFileSize(bytesPerSec)}/s`;
-    };
+    const formatSpeed = (bytesPerSec) =>
+        !bytesPerSec || bytesPerSec <= 0 ? "" : `${formatFileSize(bytesPerSec)}/s`;
 
     const statusText =
         download.status.state === "receiving"
@@ -27,21 +26,22 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
 
     const hasBlob = Boolean(download.status.blob);
 
-    // Handler for click
     const handleClick = () => {
         if (!hasBlob) return;
 
-        // Optional: revoke object URL if previously created
         if (download.status.blob) {
             URL.revokeObjectURL(download.status.blob);
         }
 
-        // Remove the download from context
-        onRemove(download.id);
+        setIsRemoving(true);
+        setTimeout(() => onRemove(download.id), 300); // match animation duration
     };
 
     return (
-        <li className="receive-file-item" ref={refProp}>
+        <li
+            className={`receive-file-item ${isRemoving ? "removing" : ""}`}
+            ref={refProp}
+        >
             <div className="file-row file-name-row">
                 <span className="file-name">{download.metadata.name}</span>
             </div>
@@ -61,7 +61,6 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
                         title={hasBlob ? "Download & Remove" : "Not ready"}
                         onClick={handleClick}
                         style={{
-                            marginLeft: "8px",
                             pointerEvents: hasBlob ? "auto" : "none",
                             opacity: hasBlob ? 1 : 0.5,
                         }}

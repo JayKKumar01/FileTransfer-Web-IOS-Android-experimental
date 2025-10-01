@@ -1,4 +1,4 @@
-/* Root container */
+/* -------------------- Root Container -------------------- */
 .receive-files-container {
     display: flex;
     flex-direction: column;
@@ -17,7 +17,7 @@
     color: #aaaaaa;
 }
 
-/* File list container */
+/* -------------------- File List Container -------------------- */
 .receive-files-list {
     width: 100%;
     max-width: 500px;
@@ -35,7 +35,7 @@
     margin: 0;
 }
 
-/* Individual file item */
+/* -------------------- Individual File Item -------------------- */
 .receive-file-item {
     display: flex;
     flex-direction: column;
@@ -43,13 +43,25 @@
     border-bottom: 1px solid #333;
     gap: 0.4rem;
     word-break: break-word;
+
+    /* Remove animation */
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+    max-height: 200px; /* large enough to fit content */
+    overflow: hidden;
 }
 
 .receive-file-item:last-child {
     border-bottom: none;
 }
 
-/* Common row styling */
+.receive-file-item.removing {
+    opacity: 0;
+    max-height: 0;
+    margin: 0;
+    padding: 0;
+}
+
+/* -------------------- Common Row Styling -------------------- */
 .file-row {
     display: flex;
     align-items: center;
@@ -83,11 +95,17 @@
     margin-left: 8px;
     cursor: pointer;
     color: #88b0ff;
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .download-link:hover {
     color: #2575fc;
+    transform: scale(1.1);
+}
+
+.download-link.disabled {
+    pointer-events: none;
+    opacity: 0.5;
 }
 
 /* Status text fallback */
@@ -117,7 +135,7 @@
     transition: width 0.2s ease;
 }
 
-/* Mobile responsiveness */
+/* -------------------- Mobile Responsiveness -------------------- */
 @media (max-width: 480px) {
     .receive-files-container {
         padding: 0.8rem;

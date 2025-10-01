@@ -20,7 +20,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
     const UI_UPDATE_INTERVAL = 1000 / UPS;
 
     // Initialize tracking refs and util
-    const initRefs = (fileId, fileName, mimeType) => {
+    const initRefs = (fileId, fileName, fileSize, mimeType) => {
         if (!bytesReceivedRef.current[fileId]) bytesReceivedRef.current[fileId] = 0;
         if (!speedRef.current[fileId]) {
             speedRef.current[fileId] = { lastBytes: 0, lastTime: performance.now() };
@@ -28,7 +28,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
         if (!uiThrottleRef.current[fileId]) uiThrottleRef.current[fileId] = 0;
 
         // Initialize file in util (buffer or StreamSaver)
-        initFile(fileId, fileName, mimeType);
+        initFile(fileId, fileName, fileSize, mimeType);
     };
 
     const sendAck = (fileId, chunkIndex) => {
@@ -104,7 +104,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
             if (!download) return;
 
             sendAck(fileId, chunkIndex);
-            initRefs(fileId, download.metadata.name, download.metadata.type);
+            initRefs(fileId, download.metadata.name, download.metadata.size, download.metadata.type);
 
             if (chunk) {
                 updateBytesReceived(fileId, chunk.byteLength);

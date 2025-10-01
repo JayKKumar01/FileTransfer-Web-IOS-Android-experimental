@@ -1,15 +1,18 @@
 import { useContext } from "react";
 import streamSaver from "streamsaver";
 import { LogContext } from "../contexts/LogContext";
-import {isApple} from "./osUtil";
+import { isApple } from "./osUtil";
 
 // -------------------- iOS Buffers --------------------
-const BUFFER_THRESHOLD = 2 * 1024 * 1024; // 2 MB
-const bufferMap = {};
-const bufferOffsetMap = {};
-const blobPartsMap = {};
+const IOS_BUFFER_THRESHOLD = 2 * 1024 * 1024; // 2 MB
+const iosBufferMap = {};
+const iosOffsetMap = {};
+const iosBlobPartsMap = {};
 
-// -------------------- Non-iOS Writers --------------------
+// -------------------- Non-iOS Buffers --------------------
+const NON_IOS_BUFFER_THRESHOLD = 8 * 1024 * 1024; // 8 MB
+const nonIosBufferMap = {};
+const nonIosOffsetMap = {};
 const writerMap = {};
 
 // -------------------- Hook Wrapper --------------------
@@ -23,27 +26,40 @@ export function useFileTransfer() {
 
     // -------------------- iOS Helpers --------------------
     async function iosInit(fileId) {
-        if (!bufferMap[fileId]) bufferMap[fileId] = new Uint8Array(BUFFER_THRESHOLD);
-        if (!bufferOffsetMap[fileId]) bufferOffsetMap[fileId] = 0;
-        if (!blobPartsMap[fileId]) blobPartsMap[fileId] = [];
-        log(`iOS Init: fileId=${fileId}`);
+        let initialized = false;
+
+        if (!iosBufferMap[fileId]) {
+            iosBufferMap[fileId] = new Uint8Array(IOS_BUFFER_THRESHOLD);
+            initialized = true;
+        }
+        if (!iosOffsetMap[fileId]) {
+            iosOffsetMap[fileId] = 0;
+            initialized = true;
+        }
+        if (!iosBlobPartsMap[fileId]) {
+            iosBlobPartsMap[fileId] = [];
+            initialized = true;
+        }
+
+        if (initialized) {
+            log(`iOS Init: fileId=${fileId}`);
+        }
     }
+
 
     async function iosPushChunk(fileId, chunk) {
         if (!chunk) return;
         let remaining = new Uint8Array(chunk);
 
         while (remaining.length > 0) {
-            const offset = bufferOffsetMap[fileId];
-            const spaceLeft = BUFFER_THRESHOLD - offset;
-
+            const offset = iosOffsetMap[fileId];
+            const spaceLeft = IOS_BUFFER_THRESHOLD - offset;
             const toWrite = remaining.subarray(0, spaceLeft);
-            bufferMap[fileId].set(toWrite, offset);
-            bufferOffsetMap[fileId] += toWrite.length;
-
+            iosBufferMap[fileId].set(toWrite, offset);
+            iosOffsetMap[fileId] += toWrite.length;
             remaining = remaining.subarray(toWrite.length);
 
-            if (bufferOffsetMap[fileId] >= BUFFER_THRESHOLD) {
+            if (iosOffsetMap[fileId] >= IOS_BUFFER_THRESHOLD) {
                 await iosFlush(fileId);
             }
         }
@@ -51,24 +67,23 @@ export function useFileTransfer() {
     }
 
     async function iosFlush(fileId) {
-        const offset = bufferOffsetMap[fileId];
+        const offset = iosOffsetMap[fileId];
         if (!offset) return;
 
-        const blob = new Blob([bufferMap[fileId].slice(0, offset)]);
-        blobPartsMap[fileId].push(blob);
-        bufferOffsetMap[fileId] = 0;
-        log(`iOS Flush: fileId=${fileId}, parts=${blobPartsMap[fileId].length}`);
+        const blob = new Blob([iosBufferMap[fileId].slice(0, offset)]);
+        iosBlobPartsMap[fileId].push(blob);
+        iosOffsetMap[fileId] = 0;
+        log(`iOS Flush: fileId=${fileId}, parts=${iosBlobPartsMap[fileId].length}`);
     }
 
     async function iosFinalize(fileId, fileName, mimeType = "application/octet-stream") {
         await iosFlush(fileId);
+        const finalBlob = new Blob(iosBlobPartsMap[fileId], { type: mimeType });
 
-        const finalBlob = new Blob(blobPartsMap[fileId], { type: mimeType });
-
-        // Cleanup maps immediately
-        delete bufferMap[fileId];
-        delete bufferOffsetMap[fileId];
-        delete blobPartsMap[fileId];
+        // Cleanup
+        delete iosBufferMap[fileId];
+        delete iosOffsetMap[fileId];
+        delete iosBlobPartsMap[fileId];
 
         return finalBlob;
     }
@@ -78,25 +93,58 @@ export function useFileTransfer() {
         if (!writerMap[fileId]) {
             const fileStream = streamSaver.createWriteStream(fileName, { size: 0, mimeType });
             writerMap[fileId] = fileStream.getWriter();
+            nonIosBufferMap[fileId] = new Uint8Array(NON_IOS_BUFFER_THRESHOLD);
+            nonIosOffsetMap[fileId] = 0;
             log(`Non-iOS Init: fileId=${fileId}, fileName=${fileName}`);
         }
     }
 
     async function nonIosPushChunk(fileId, chunk) {
-        const writer = writerMap[fileId];
-        if (writer && chunk) {
-            await writer.write(new Uint8Array(chunk));
-            log(`Non-iOS PushChunk: fileId=${fileId}, size=${chunk.byteLength}`);
+        if (!chunk) return;
+        const buffer = nonIosBufferMap[fileId];
+        let offset = nonIosOffsetMap[fileId];
+        let remaining = new Uint8Array(chunk);
+
+        while (remaining.length > 0) {
+            const spaceLeft = NON_IOS_BUFFER_THRESHOLD - offset;
+            const toWrite = remaining.subarray(0, spaceLeft);
+            buffer.set(toWrite, offset);
+            offset += toWrite.length;
+            remaining = remaining.subarray(toWrite.length);
+
+            if (offset >= NON_IOS_BUFFER_THRESHOLD) {
+                await nonIosFlush(fileId, buffer, offset);
+                offset = 0;
+            }
         }
+
+        nonIosOffsetMap[fileId] = offset;
+        log(`Non-iOS PushChunk: fileId=${fileId}, size=${chunk.byteLength}`);
+    }
+
+    async function nonIosFlush(fileId, buffer, offset) {
+        const writer = writerMap[fileId];
+        if (!writer || offset === 0) return;
+
+        await writer.write(buffer.subarray(0, offset));
+        log(`Non-iOS Flush: fileId=${fileId}, flushed=${offset} bytes`);
     }
 
     async function nonIosFinalize(fileId) {
         const writer = writerMap[fileId];
-        if (writer) {
-            await writer.close();
-            delete writerMap[fileId];
-            log(`Non-iOS Finalize: fileId=${fileId}`);
-        }
+        if (!writer) return;
+
+        const offset = nonIosOffsetMap[fileId];
+        if (offset > 0) await nonIosFlush(fileId, nonIosBufferMap[fileId], offset);
+
+        await writer.close();
+
+        // Cleanup
+        delete writerMap[fileId];
+        delete nonIosBufferMap[fileId];
+        delete nonIosOffsetMap[fileId];
+
+        log(`Non-iOS Finalize: fileId=${fileId}`);
     }
 
     // -------------------- Public API --------------------
@@ -106,9 +154,6 @@ export function useFileTransfer() {
         },
         pushChunk(fileId, chunk) {
             return isApple() ? iosPushChunk(fileId, chunk) : nonIosPushChunk(fileId, chunk);
-        },
-        flushBuffer(fileId) {
-            return isApple() ? iosFlush(fileId) : Promise.resolve();
         },
         finalizeFile(fileId, fileName, mimeType = "application/octet-stream") {
             return isApple() ? iosFinalize(fileId, fileName, mimeType) : nonIosFinalize(fileId);

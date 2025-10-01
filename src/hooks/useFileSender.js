@@ -1,13 +1,11 @@
 import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
-import {isApple} from "../utils/osUtil";
+import { isAndroid } from "../utils/osUtil";
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
-const MAX_BUFFER_SIZE = isApple() ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
-
-// -------------------- Global UI update config --------------------
-const UPS = 6; // updates per second
-const UI_UPDATE_INTERVAL = 1000 / UPS; // milliseconds
+const ANDROID_BUFFER_SIZE = 8 * 1024 * 1024; // 8 MB
+const UPS = 6; // UI updates per second
+const UI_UPDATE_INTERVAL = 1000 / UPS;
 
 export const useFileSender = (files, updateFile) => {
     const { connection, isConnectionReady } = usePeer();
@@ -15,19 +13,20 @@ export const useFileSender = (files, updateFile) => {
     const currentFileRef = useRef(null);
     const isSendingRef = useRef(false);
     const bytesSentRef = useRef(0);
+    const uiThrottleRef = useRef(0);
+    const speedRef = useRef({ lastSent: 0, lastTime: 0 });
 
+    // Android-specific buffer refs
     const bufferRef = useRef(null);
     const bufferOffsetRef = useRef(0);
     const fileOffsetRef = useRef(0);
 
-    const speedRef = useRef({ lastSent: 0, lastTime: 0 });
-    const uiThrottleRef = useRef(0); // timestamp of last UI update
-
+    // -------------------- Android buffer logic --------------------
     const refillBuffer = async (file) => {
         const remaining = file.file.size - fileOffsetRef.current;
         if (remaining <= 0) return false;
 
-        const bufferSize = Math.min(MAX_BUFFER_SIZE, remaining);
+        const bufferSize = Math.min(ANDROID_BUFFER_SIZE, remaining);
         const slice = file.file.slice(fileOffsetRef.current, fileOffsetRef.current + bufferSize);
         bufferRef.current = await slice.arrayBuffer();
         bufferOffsetRef.current = 0;
@@ -35,45 +34,77 @@ export const useFileSender = (files, updateFile) => {
         return true;
     };
 
-    const getNextChunk = async (file) => {
+    const sendChunkAndroid = async () => {
+        const file = currentFileRef.current;
+        if (!file) return;
+
         if (!bufferRef.current || bufferOffsetRef.current >= bufferRef.current.byteLength) {
             const hasMore = await refillBuffer(file);
-            if (!hasMore) return null;
+            if (!hasMore) return;
         }
 
         const remaining = bufferRef.current.byteLength - bufferOffsetRef.current;
         const size = Math.min(CHUNK_SIZE, remaining);
         const chunk = bufferRef.current.slice(bufferOffsetRef.current, bufferOffsetRef.current + size);
         bufferOffsetRef.current += size;
-        return chunk;
-    };
 
-    const sendChunk = async (file) => {
-        const data = await getNextChunk(file);
-        if (!data) return;
-
-        speedRef.current.lastSent = data.byteLength;
+        speedRef.current.lastSent = chunk.byteLength;
         speedRef.current.lastTime = performance.now();
 
-        connection.send({ type: "chunk", fileId: file.id, chunkIndex: Math.floor(bytesSentRef.current / CHUNK_SIZE), data });
-        bytesSentRef.current += data.byteLength;
+        connection.send({
+            type: "chunk",
+            fileId: file.id,
+            chunkIndex: Math.floor(bytesSentRef.current / CHUNK_SIZE),
+            data: chunk,
+        });
+
+        bytesSentRef.current += chunk.byteLength;
+    };
+
+    // -------------------- Non-Android simple chunk logic --------------------
+    const sendChunkSimple = async () => {
+        const file = currentFileRef.current;
+        if (!file) return;
+
+        const start = bytesSentRef.current;
+        const end = Math.min(start + CHUNK_SIZE, file.file.size);
+        if (start >= file.file.size) return;
+
+        const chunk = await file.file.slice(start, end).arrayBuffer();
+
+        speedRef.current.lastSent = chunk.byteLength;
+        speedRef.current.lastTime = performance.now();
+
+        connection.send({
+            type: "chunk",
+            fileId: file.id,
+            chunkIndex: Math.floor(bytesSentRef.current / CHUNK_SIZE),
+            data: chunk,
+        });
+
+        bytesSentRef.current += chunk.byteLength;
+    };
+
+    const sendNextChunk = () => {
+        return isAndroid() ? sendChunkAndroid() : sendChunkSimple();
     };
 
     const startFileTransfer = (file) => {
         currentFileRef.current = file;
         isSendingRef.current = true;
         bytesSentRef.current = 0;
+        uiThrottleRef.current = 0;
+        speedRef.current = { lastSent: 0, lastTime: 0 };
 
+        // reset Android buffer
         bufferRef.current = null;
         bufferOffsetRef.current = 0;
         fileOffsetRef.current = 0;
-        speedRef.current = { lastSent: 0, lastTime: 0 };
-        uiThrottleRef.current = 0;
 
         updateFile(file.id, { state: "sending", progress: 0, speed: 0 });
-        console.log(`📤 Starting file transfer: "${file.metadata.name}" (buffer=${MAX_BUFFER_SIZE / 1024 / 1024}MB)`);
+        console.log(`📤 Starting file transfer: "${file.metadata.name}"`);
 
-        sendChunk(file);
+        sendNextChunk();
     };
 
     const finishFile = () => {
@@ -81,11 +112,11 @@ export const useFileSender = (files, updateFile) => {
         if (!file) return;
 
         updateFile(file.id, { state: "sent", progress: file.metadata.size, speed: 0 });
-
         currentFileRef.current = null;
         isSendingRef.current = false;
         bytesSentRef.current = 0;
 
+        // reset Android buffer
         bufferRef.current = null;
         bufferOffsetRef.current = 0;
         fileOffsetRef.current = 0;
@@ -94,7 +125,8 @@ export const useFileSender = (files, updateFile) => {
     };
 
     const processAck = (ack) => {
-        if (!currentFileRef.current || ack.fileId !== currentFileRef.current.id) return;
+        const file = currentFileRef.current;
+        if (!file || ack.fileId !== file.id) return;
 
         let speed = 0;
         if (speedRef.current.lastSent && speedRef.current.lastTime) {
@@ -102,15 +134,15 @@ export const useFileSender = (files, updateFile) => {
             if (delta > 0) speed = speedRef.current.lastSent / delta;
         }
 
-        if (bytesSentRef.current >= currentFileRef.current.metadata.size) {
+        if (bytesSentRef.current >= file.metadata.size) {
             finishFile();
         } else {
             const now = performance.now();
             if (now - uiThrottleRef.current >= UI_UPDATE_INTERVAL) {
-                updateFile(currentFileRef.current.id, { progress: bytesSentRef.current, speed });
+                updateFile(file.id, { progress: bytesSentRef.current, speed });
                 uiThrottleRef.current = now;
             }
-            sendChunk(currentFileRef.current);
+            sendNextChunk();
         }
     };
 

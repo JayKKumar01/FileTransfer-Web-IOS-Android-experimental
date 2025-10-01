@@ -21,6 +21,9 @@ export const isApple = () => {
     return false;
 };
 
+export const isAndroid = () => {
+    return /Android/i.test(navigator.userAgent);
+}
 
 /**
  * Prevent pinch/zoom on iOS

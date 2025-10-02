@@ -51,7 +51,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
                 updateDownload(fileId, {
                     progress: download.trackingManager.getTotalSize(),
                     speed: 0,
-                    state: "received",
+                    state:  blob ? "received" : "downloaded",
                     blob,
                 });
             } else {

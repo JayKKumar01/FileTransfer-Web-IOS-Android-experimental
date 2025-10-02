@@ -47,7 +47,7 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
                 id: f.id,
                 metadata: f.metadata,
                 status: {
-                    state: "pending",
+                    state: "waiting",
                     progress: 0,
                     speed: 0,
                     blob: null,

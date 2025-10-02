@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
-import {isApple} from "../utils/osUtil";
+import { isApple } from "../utils/osUtil";
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
 
 const APPLE_BUFFER_SIZE = 2 * 1024 * 1024; // 2 MB for iOS/macOS
-const DEFAULT_BUFFER_SIZE = 8 * 1024 * 1024;   // 8 MB for Android/others
+const DEFAULT_BUFFER_SIZE = 8 * 1024 * 1024; // 8 MB for Android/others
 const BUFFER_SIZE = isApple() ? APPLE_BUFFER_SIZE : DEFAULT_BUFFER_SIZE;
 
 const UPS = 6; // UI updates per second
@@ -21,7 +21,7 @@ export const useFileSender = (files, updateFile) => {
     const speedRef = useRef({ lastTime: performance.now(), lastTotal: 0 });
 
     // Android buffer refs
-    const bufferRef = useRef(null);
+    const bufferRef = useRef(null);       // will hold ArrayBuffer
     const bufferOffsetRef = useRef(0);
     const fileOffsetRef = useRef(0);
 
@@ -32,27 +32,30 @@ export const useFileSender = (files, updateFile) => {
 
         const size = Math.min(BUFFER_SIZE, remaining);
         const slice = file.slice(fileOffsetRef.current, fileOffsetRef.current + size);
-        const arrayBuffer = await slice.arrayBuffer();
-        bufferRef.current = new Uint8Array(arrayBuffer);
+        bufferRef.current = await slice.arrayBuffer(); // ✅ store ArrayBuffer directly
         bufferOffsetRef.current = 0;
         fileOffsetRef.current += size;
         return true;
     };
-
 
     // -------------------- Send next chunk --------------------
     const sendNextChunk = async () => {
         const file = currentFileRef.current;
         if (!file || !connection) return;
 
-        if (!bufferRef.current || bufferOffsetRef.current >= bufferRef.current.length) {
+        if (!bufferRef.current || bufferOffsetRef.current >= bufferRef.current.byteLength) {
             const hasMore = await refillBuffer(file.file);
             if (!hasMore) return;
         }
 
-        const remaining = bufferRef.current.length - bufferOffsetRef.current;
+        const remaining = bufferRef.current.byteLength - bufferOffsetRef.current;
         const size = Math.min(CHUNK_SIZE, remaining);
-        const chunk = bufferRef.current.subarray(bufferOffsetRef.current, bufferOffsetRef.current + size);
+
+        // ✅ slice ArrayBuffer to make a new chunk
+        const chunk = bufferRef.current.slice(
+            bufferOffsetRef.current,
+            bufferOffsetRef.current + size
+        );
         bufferOffsetRef.current += size;
 
         connection.send({
@@ -64,7 +67,6 @@ export const useFileSender = (files, updateFile) => {
 
         bytesSentRef.current += chunk.byteLength;
     };
-
 
     // -------------------- Start / Finish --------------------
     const startFileTransfer = (file) => {
@@ -104,16 +106,13 @@ export const useFileSender = (files, updateFile) => {
         const file = currentFileRef.current;
         if (!file || ack.fileId !== file.id) return;
 
-        // -------------------- Completion check --------------------
         if (bytesSentRef.current >= file.metadata.size) {
             finishFile();
             return;
         }
 
-        // -------------------- Send next chunk immediately --------------------
         sendNextChunk();
 
-        // -------------------- Throttled UI update with correct speed --------------------
         const now = performance.now();
         if (now - uiThrottleRef.current >= UI_UPDATE_INTERVAL) {
             const delta = (now - speedRef.current.lastTime) / 1000;
@@ -131,7 +130,7 @@ export const useFileSender = (files, updateFile) => {
     // -------------------- Effects --------------------
     useEffect(() => {
         if (!isConnectionReady || isSendingRef.current) return;
-        const nextFile = files.find(f => f.status.state === "pending");
+        const nextFile = files.find(f => f.status.state === "waiting");
         if (nextFile) startFileTransfer(nextFile);
     }, [files, isConnectionReady]);
 

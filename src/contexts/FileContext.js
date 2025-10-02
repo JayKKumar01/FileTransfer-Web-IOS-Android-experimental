@@ -38,7 +38,7 @@ export const FileProvider = ({ children }) => {
             file,
             metadata: { name: file.name, size: file.size, type: file.type },
             metaSent: false,
-            status: { state: "pending", progress: 0 },
+            status: { state: "waiting", progress: 0 },
         }));
         setFiles(prev => [...prev, ...items]);
     };

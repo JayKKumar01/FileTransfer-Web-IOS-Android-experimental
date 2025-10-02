@@ -135,6 +135,25 @@
     transition: width 0.2s ease;
 }
 
+/* -------------------- Download All Button -------------------- */
+.download-all-zip-btn {
+    background-color: #2575fc;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    margin-top: 0.5rem;
+}
+
+.download-all-zip-btn:hover,
+.download-all-zip-btn:focus {
+    background-color: #1a5ed1;
+    transform: scale(1.03);
+}
+
 /* -------------------- Mobile Responsiveness -------------------- */
 @media (max-width: 480px) {
     .receive-files-container {
@@ -165,5 +184,10 @@
 
     .download-link {
         margin-left: 6px;
+    }
+
+    .download-all-zip-btn {
+        padding: 0.6rem;
+        font-size: 0.95rem;
     }
 }

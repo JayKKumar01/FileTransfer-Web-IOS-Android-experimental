@@ -9,7 +9,7 @@
 
 /**
  * @typedef {Object} FileStatus
- * @property {"pending"|"sending"|"sent"|"failed"} state - Current transfer state
+ * @property {"waiting"|"sending"|"sent"|"failed"} state - Current transfer state
  * @property {number} progress - Bytes sent so far (in bytes)
  * @property {number} [speed] - Current transfer speed in bytes per second
  * @property {string} [error] - Optional error information

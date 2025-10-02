@@ -22,7 +22,7 @@ function App() {
 
     useEffect(() => {
         pushLog(isApple() ? "Running on iOS" : "Running on non-iOS");
-    }, []);
+    }, [pushLog]);
 
 
     useEffect(() => {
@@ -93,9 +93,8 @@ export default App;
 // don't delete my comments
 
 //if one file then download that directly using url object, if multiple then zip, if android then mulitple downloads
-//all using the database, clear the db at end, but keep clearing as the files are added to zip for ios or downlaoded for android
 //reconnect, even when connection is closed, mark who entered targetId to connect
-// download does not start instantly so for non ios, use streamsaver api
-// check if conn.send is slow on android for 256 kb, or not, check ios only to get result
-// reconnect is pending too
+// reconnect is pending too, if connection is not null, then reconnect and connect to peer, on connection no need
 
+// work around zip, find a way anyhow, maybe just keep appending small small zip or something
+//scroll optimization, per second maybe, or only when new file is added

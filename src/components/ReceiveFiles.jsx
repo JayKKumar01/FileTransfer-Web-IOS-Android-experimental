@@ -27,13 +27,22 @@ const ReceiveFiles = () => {
     }, [downloads]);
 
     const handleDownloadAll = async () => {
+        // Create a static snapshot of downloads at this moment
+        const downloadsSnapshot = downloads.map(d => ({
+            ...d,
+            status: { ...d.status, blobs: [...d.status.blobs] },
+            metadata: { ...d.metadata }
+        }));
+
         await downloadZip(
-            downloads,
-            (percent) => setZipProgress(percent),
-            (id) => setZippedIds(prev => new Set(prev).add(id)) // mark as zipped
+            downloadsSnapshot,                    // pass static copy
+            (percent) => setZipProgress(percent), // overall progress
+            (id) => setZippedIds(prev => new Set(prev).add(id)) // mark individual file as zipped
         );
+
         setTimeout(() => setZipProgress(0), 500);
     };
+
 
     if (!downloads.length) {
         return (

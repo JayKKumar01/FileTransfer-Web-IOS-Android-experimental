@@ -8,12 +8,15 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
     const urlRef = useRef(null);
 
     useEffect(() => {
-        if (isZipped) {
+        if (isZipped && download) {  // ensure download exists
             setIsRemoving(true);
-            const timer = setTimeout(() => onRemove(download.id), 300);
+            const timer = setTimeout(() => {
+                onRemove?.(download.id); // optional chaining for safety
+            }, 300);
             return () => clearTimeout(timer);
         }
-    }, [isZipped, download.id, onRemove]);
+    }, [isZipped, download, onRemove]);
+
 
 
 

@@ -94,7 +94,7 @@ const SendFiles = () => {
     return (
         <div className="send-files-container">
             <div className="downloads-count">
-                Completed: {completedCount} / {files.length}
+                Sent: {completedCount} / {files.length}
             </div>
             <div className="send-files-list">
                 <ul>

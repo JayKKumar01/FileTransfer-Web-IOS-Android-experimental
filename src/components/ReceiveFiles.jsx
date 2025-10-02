@@ -71,7 +71,7 @@ const ReceiveFiles = () => {
         <div className="receive-files-container">
             {/* Completed count display */}
             <div className="downloads-count">
-                Completed: {completedCount} / {downloads.length}
+                Received: {completedCount} / {downloads.length}
             </div>
             <div className="receive-files-list">
                 <ul>

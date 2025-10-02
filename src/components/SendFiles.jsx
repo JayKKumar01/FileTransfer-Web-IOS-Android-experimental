@@ -52,16 +52,22 @@ const SendFiles = () => {
     const { files } = useContext(FileContext);
     const navigate = useNavigate();
     const itemRefs = useRef({});
+    const prevFilesLength = useRef(files.length);
 
-    // Scroll to the first file that is currently sending
     useEffect(() => {
-        const sendingFile = files.find(f => f.status.state === "sending");
-        if (sendingFile && itemRefs.current[sendingFile.id]) {
-            itemRefs.current[sendingFile.id].scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-            });
+        if (files.length !== prevFilesLength.current) {
+            // Scroll to the first file that is currently sending
+            const sendingFile = files.find(f => f.status.state === "sending");
+            if (sendingFile && itemRefs.current[sendingFile.id]) {
+                itemRefs.current[sendingFile.id].scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                });
+            }
         }
+
+        // Update the previous length
+        prevFilesLength.current = files.length;
     }, [files]);
 
     if (files.length === 0) {

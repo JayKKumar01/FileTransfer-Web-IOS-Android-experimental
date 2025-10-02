@@ -10,6 +10,7 @@ const ReceiveFiles = () => {
     const itemRefs = useRef({});
     const [zipProgress, setZipProgress] = useState(0);
     const [zippedIds, setZippedIds] = useState(new Set());
+    const prevDownloadsLength = useRef(downloads.length);
 
     const allReceived = useMemo(
         () => downloads.length > 0 && downloads.every(d => d.status.state === "received"),
@@ -17,13 +18,19 @@ const ReceiveFiles = () => {
     );
 
     useEffect(() => {
-        const activeDownload = downloads.find(d => d.status.state === "receiving");
-        if (activeDownload && itemRefs.current[activeDownload.id]) {
-            itemRefs.current[activeDownload.id].scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-            });
+        if (downloads.length !== prevDownloadsLength.current) {
+            // Scroll to the active download if it exists
+            const activeDownload = downloads.find(d => d.status.state === "receiving");
+            if (activeDownload && itemRefs.current[activeDownload.id]) {
+                itemRefs.current[activeDownload.id].scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                });
+            }
         }
+
+        // Update the previous length
+        prevDownloadsLength.current = downloads.length;
     }, [downloads]);
 
     const handleDownloadAll = async () => {

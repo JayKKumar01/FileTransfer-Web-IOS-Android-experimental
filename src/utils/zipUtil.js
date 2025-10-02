@@ -40,8 +40,11 @@ export async function createZip(files) {
     const centralDirectory = [];
     let offset = 0;
 
-    for (const fileIndex in files) {
-        const file = files[fileIndex];
+    // Total blobs across all files
+    const totalBlobs = files.reduce((sum, f) => sum + f.status.blobs.length, 0);
+    let processedBlobs = 0;
+
+    for (const file of files) {
         const { blobs } = file.status;
         const { name } = file.metadata;
         const fileNameBytes = new TextEncoder().encode(name);
@@ -65,11 +68,10 @@ export async function createZip(files) {
         const localHeaderOffset = offset;
         offset += localHeader.length;
 
-        // Process each blob part sequentially with progress
+        // Process each blob part sequentially
         let crc = 0;
         let totalSize = 0;
-        for (let partIndex = 0; partIndex < blobs.length; partIndex++) {
-            const blobPart = blobs[partIndex];
+        for (const blobPart of blobs) {
             const arrayBuffer = await blobPart.arrayBuffer();
             const data = new Uint8Array(arrayBuffer);
 
@@ -78,10 +80,11 @@ export async function createZip(files) {
             fileData.push(data);
             offset += data.length;
 
-            // Progress logging
-            if (partIndex % 10 === 0 || partIndex === blobs.length - 1) {
-                const percent = ((partIndex + 1) / blobs.length * 100).toFixed(1);
-                console.log(`File ${parseInt(fileIndex)+1}/${files.length} "${name}": ${percent}%`);
+            // Update global progress
+            processedBlobs++;
+            if (processedBlobs % 5 === 0 || processedBlobs === totalBlobs) {
+                const percent = ((processedBlobs / totalBlobs) * 100).toFixed(1);
+                console.log(`Zip progress: ${percent}%`);
                 await Promise.resolve(); // yield to UI
             }
         }
@@ -136,6 +139,7 @@ export async function createZip(files) {
     const allParts = [...fileData, ...centralDirectory, endRecord];
     return new Blob(allParts, { type: "application/zip" });
 }
+
 
 
 // Public API: download zip

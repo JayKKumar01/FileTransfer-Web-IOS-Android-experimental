@@ -113,3 +113,7 @@ export default App;
 // just cross check if new send chunk is slow
 
 //qr idea to connect peers
+
+// copy share link
+
+// no individual 4gb+ for zip, warn for 4gb+ combined, only donwload first 4gb

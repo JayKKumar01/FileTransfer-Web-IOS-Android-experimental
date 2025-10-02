@@ -51,8 +51,8 @@
     border-bottom: 1px solid #333;
     gap: 0.4rem;
     word-break: break-word;
-    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
-    max-height: 200px; /* large enough for content */
+    transition: all 0.3s ease;
+    max-height: 200px;
     overflow: hidden;
 }
 
@@ -98,6 +98,17 @@
 
 .file-status {
     color: #bbb;
+}
+
+/* -------------------- Warning Row -------------------- */
+.file-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.2rem;
 }
 
 /* -------------------- Download Link -------------------- */
@@ -201,5 +212,9 @@
 
     .downloads-count {
         font-size: 0.9rem;
+    }
+
+    .file-warning {
+        font-size: 0.8rem;
     }
 }

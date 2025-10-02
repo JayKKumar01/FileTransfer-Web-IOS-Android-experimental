@@ -3,8 +3,6 @@ import { Download } from "lucide-react";
 import { formatFileSize } from "../utils/fileUtil";
 import { isApple } from "../utils/osUtil";
 
-const MAX_ZIP_SIZE = 4 * 1024 ** 3; // 4 GB
-
 const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
     const [isRemoving, setIsRemoving] = useState(false);
     const urlRef = useRef(null);
@@ -13,14 +11,6 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
         () => Array.isArray(download.status.blobs) && download.status.blobs.length > 0,
         [download.status.blobs]
     );
-
-    // Calculate total size of all blobs
-    const totalBlobSize = useMemo(
-        () => download.status.blobs?.reduce((acc, blob) => acc + blob.size, 0) || 0,
-        [download.status.blobs]
-    );
-
-    const exceedsZipLimit = totalBlobSize > MAX_ZIP_SIZE;
 
     const progressPercent = useMemo(
         () => Math.min((download.status.progress / download.metadata.size) * 100, 100).toFixed(2),
@@ -58,9 +48,11 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
         }
     }, [isZipped, download, onRemove]);
 
+    // Handle individual download click
     const handleClick = () => {
         if (!hasBlobParts) return;
 
+        // Trigger download manually to avoid premature URL revocation
         const link = document.createElement("a");
         link.href = urlRef.current;
         link.download = download.metadata.name;
@@ -68,22 +60,16 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
         link.click();
         document.body.removeChild(link);
 
+        // Start removal animation
         setIsRemoving(true);
         setTimeout(() => onRemove?.(download.id), 300);
     };
 
     return (
         <li className={`receive-file-item ${isRemoving ? "removing" : ""}`} ref={refProp}>
-            {exceedsZipLimit && (
-                <div className="file-warning">
-                    ⚠️ File over 4GB – ZIP skips it. Download individually.
-                </div>
-
-            )}
             <div className="file-row file-name-row">
                 <span className="file-name">{download.metadata.name}</span>
             </div>
-
             <div className="file-row file-progress-row">
                 <span className="file-progress-text">
                     {formatFileSize(download.status.progress)} / {formatFileSize(download.metadata.size)}
@@ -101,7 +87,6 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
                     </button>
                 )}
             </div>
-
             <div className="file-row progress-bar-row">
                 <div className="progress-bar">
                     <div className="progress-fill" style={{ width: `${progressPercent}%` }} />

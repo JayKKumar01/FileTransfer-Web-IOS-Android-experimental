@@ -34,7 +34,7 @@ function uint32LE(num) {
 
 // --- Core function to create ZIP ---
 export async function createZip(files, onProgress) {
-    const fileData = [];
+    const fileParts = []; // store Blob objects only
     const centralDirectory = [];
     let offset = 0;
 
@@ -60,28 +60,32 @@ export async function createZip(files, onProgress) {
             ...uint16LE(0),
             ...fileNameBytes
         ]);
-        fileData.push(localHeader);
+
+        fileParts.push(new Blob([localHeader]));
         const localHeaderOffset = offset;
         offset += localHeader.length;
 
         let crc = 0;
         let totalSize = 0;
 
-        // Process each blob part
         for (const blobPart of blobs) {
             const arrayBuffer = await blobPart.arrayBuffer();
             const data = new Uint8Array(arrayBuffer);
 
             crc = crc32(crc, data);
             totalSize += data.length;
-            fileData.push(data);
+
+            fileParts.push(blobPart); // push original Blob, not Uint8Array
             offset += data.length;
 
-            // Update global progress
+            // release memory
+            data.fill(0);
+
+            // progress callback
             processedBlobs++;
             if (onProgress && (processedBlobs % 5 === 0 || processedBlobs === totalBlobs)) {
-                const percent = Math.min(((processedBlobs / totalBlobs) * 100), 100);
-                onProgress(Number(percent.toFixed(2))); // 2 decimal places
+                const percent = Math.min((processedBlobs / totalBlobs) * 100, 100);
+                onProgress(Number(percent.toFixed(2)));
                 await Promise.resolve(); // yield to UI
             }
         }
@@ -93,7 +97,7 @@ export async function createZip(files, onProgress) {
             ...uint32LE(totalSize),
             ...uint32LE(totalSize)
         ]);
-        fileData.push(descriptor);
+        fileParts.push(new Blob([descriptor]));
         offset += descriptor.length;
 
         // Central directory entry
@@ -116,12 +120,12 @@ export async function createZip(files, onProgress) {
             ...uint32LE(localHeaderOffset),
             ...fileNameBytes
         ]);
-        centralDirectory.push(centralHeader);
+        centralDirectory.push(new Blob([centralHeader]));
     }
 
-    const centralSize = centralDirectory.reduce((sum, part) => sum + part.length, 0);
+    // End of central directory
+    const centralSize = centralDirectory.reduce((sum, b) => sum + b.size, 0);
     const centralOffset = offset;
-
     const endRecord = new Uint8Array([
         0x50,0x4b,0x05,0x06,
         ...uint16LE(0),
@@ -133,7 +137,7 @@ export async function createZip(files, onProgress) {
         ...uint16LE(0)
     ]);
 
-    const allParts = [...fileData, ...centralDirectory, endRecord];
+    const allParts = [...fileParts, ...centralDirectory, new Blob([endRecord])];
     return new Blob(allParts, { type: "application/zip" });
 }
 

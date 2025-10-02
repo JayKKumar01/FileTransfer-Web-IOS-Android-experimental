@@ -52,7 +52,7 @@ const SendFiles = () => {
     const { files } = useContext(FileContext);
     const navigate = useNavigate();
     const itemRefs = useRef({});
-    const scrolledFiles = useRef<Set<string>>(new Set());
+    const scrolledFiles = useRef(new Set());
 
     useEffect(() => {
         // Find the first sending file that hasn't been scrolled yet

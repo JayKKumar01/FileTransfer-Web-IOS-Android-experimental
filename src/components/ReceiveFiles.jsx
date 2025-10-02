@@ -16,7 +16,7 @@ const ReceiveFiles = () => {
         [downloads]
     );
 
-    const scrolledDownloads = useRef<Set<string>>(new Set());
+    const scrolledDownloads = useRef(new Set());
 
     useEffect(() => {
         // Find the first receiving download that hasn't been scrolled yet

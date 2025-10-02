@@ -1,4 +1,5 @@
 // zipUtil.js
+// Assumes files: [{ metadata: { name }, status: { blobs: [Blob, ...] } }, ...]
 
 // --- CRC32 TABLE (precomputed) ---
 const crcTable = (() => {
@@ -13,12 +14,12 @@ const crcTable = (() => {
     return crcTable;
 })();
 
-function crc32(buf) {
-    let crc = 0 ^ (-1);
+function crc32(crc, buf) {
+    let c = crc ^ -1;
     for (let i = 0; i < buf.length; i++) {
-        crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xff];
+        c = (c >>> 8) ^ crcTable[(c ^ buf[i]) & 0xff];
     }
-    return (crc ^ (-1)) >>> 0;
+    return c ^ -1;
 }
 
 function uint16LE(num) {
@@ -34,85 +35,100 @@ function uint32LE(num) {
     ];
 }
 
-async function createZip(files) {
-    let fileData = [];
-    let centralDirectory = [];
+export async function createZip(files) {
+    const fileData = [];
+    const centralDirectory = [];
     let offset = 0;
 
     for (const file of files) {
-        const { blob } = file.status;
+        const { blobs } = file.status;
         const { name } = file.metadata;
-
-        const arrayBuffer = await blob.arrayBuffer();
-        const data = new Uint8Array(arrayBuffer);
-
-        const crc = crc32(data);
-        const compressedSize = data.length;
-        const uncompressedSize = data.length;
         const fileNameBytes = new TextEncoder().encode(name);
 
-        // Local file header
+        // Local file header with placeholders (data descriptor flag = 8)
         const localHeader = new Uint8Array([
-            ...[0x50, 0x4b, 0x03, 0x04], // Local file header signature
-            ...uint16LE(20),             // Version needed
-            ...uint16LE(0),              // Flags
-            ...uint16LE(0),              // Compression method (0 = store)
-            ...uint16LE(0), ...uint16LE(0), // File mod time/date
-            ...uint32LE(crc),
-            ...uint32LE(compressedSize),
-            ...uint32LE(uncompressedSize),
+            0x50,0x4b,0x03,0x04,       // signature
+            ...uint16LE(20),            // version needed
+            ...uint16LE(8),             // flags (bit 3 = data descriptor)
+            ...uint16LE(0),             // compression method (store)
+            ...uint16LE(0),...uint16LE(0), // time/date
+            ...uint32LE(0),             // CRC placeholder
+            ...uint32LE(0),             // compressed size placeholder
+            ...uint32LE(0),             // uncompressed size placeholder
             ...uint16LE(fileNameBytes.length),
-            ...uint16LE(0),              // Extra field length
+            ...uint16LE(0),             // extra length
             ...fileNameBytes
         ]);
 
-        fileData.push(localHeader, data);
+        fileData.push(localHeader);
+        const localHeaderOffset = offset;
+        offset += localHeader.length;
 
-        // Central directory header
+        // Process each blob part sequentially
+        let crc = 0;
+        let totalSize = 0;
+        for (const blobPart of blobs) {
+            const arrayBuffer = await blobPart.arrayBuffer();
+            const data = new Uint8Array(arrayBuffer);
+            crc = crc32(crc, data);
+            totalSize += data.length;
+            fileData.push(data);
+            offset += data.length;
+        }
+
+        // Data descriptor (actual CRC and sizes)
+        const descriptor = new Uint8Array([
+            0x50,0x4b,0x07,0x08,       // data descriptor signature
+            ...uint32LE(crc >>> 0),
+            ...uint32LE(totalSize),
+            ...uint32LE(totalSize)
+        ]);
+        fileData.push(descriptor);
+        offset += descriptor.length;
+
+        // Central directory entry
         const centralHeader = new Uint8Array([
-            ...[0x50, 0x4b, 0x01, 0x02], // Central file header signature
-            ...uint16LE(20),             // Version made by
-            ...uint16LE(20),             // Version needed to extract
-            ...uint16LE(0),              // General purpose bit flag
-            ...uint16LE(0),              // Compression method
-            ...uint16LE(0), ...uint16LE(0), // File time/date
-            ...uint32LE(crc),
-            ...uint32LE(compressedSize),
-            ...uint32LE(uncompressedSize),
+            0x50,0x4b,0x01,0x02,       // signature
+            ...uint16LE(20),            // version made by
+            ...uint16LE(20),            // version needed
+            ...uint16LE(8),             // flags (data descriptor)
+            ...uint16LE(0),             // compression method
+            ...uint16LE(0),...uint16LE(0),
+            ...uint32LE(crc >>> 0),
+            ...uint32LE(totalSize),
+            ...uint32LE(totalSize),
             ...uint16LE(fileNameBytes.length),
-            ...uint16LE(0),              // Extra field length
-            ...uint16LE(0),              // File comment length
-            ...uint16LE(0),              // Disk number start
-            ...uint16LE(0),              // Internal file attrs
-            ...uint32LE(0),              // External file attrs
-            ...uint32LE(offset),         // Relative offset of local header
+            ...uint16LE(0),             // extra
+            ...uint16LE(0),             // comment
+            ...uint16LE(0),             // disk
+            ...uint16LE(0),             // internal attrs
+            ...uint32LE(0),             // external attrs
+            ...uint32LE(localHeaderOffset),
             ...fileNameBytes
         ]);
-
         centralDirectory.push(centralHeader);
-        offset += localHeader.length + data.length;
     }
 
     const centralSize = centralDirectory.reduce((sum, part) => sum + part.length, 0);
     const centralOffset = offset;
 
-    // End of central directory record
+    // End of central directory
     const endRecord = new Uint8Array([
-        ...[0x50, 0x4b, 0x05, 0x06],
-        ...uint16LE(0), // Disk number
-        ...uint16LE(0), // Disk with central dir
+        0x50,0x4b,0x05,0x06,
+        ...uint16LE(0),  // disk
+        ...uint16LE(0),  // disk with central dir
         ...uint16LE(files.length),
         ...uint16LE(files.length),
         ...uint32LE(centralSize),
         ...uint32LE(centralOffset),
-        ...uint16LE(0)  // Comment length
+        ...uint16LE(0)   // comment length
     ]);
 
     const allParts = [...fileData, ...centralDirectory, endRecord];
     return new Blob(allParts, { type: "application/zip" });
 }
 
-// --- Public API ---
+// Public API: download zip
 export async function downloadZip(files, zipName = "files.zip") {
     const zipBlob = await createZip(files);
     const url = URL.createObjectURL(zipBlob);

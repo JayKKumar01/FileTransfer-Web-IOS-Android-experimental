@@ -109,11 +109,52 @@ const ReceiveFiles = () => {
     }, [downloads]);
 
 
+    // -------------------- Simulate Downloads --------------------
+    async function simulateDownloadsAsync(numFiles = 10, partsPerFile = 512, partSizeMB = 2) {
+        const downloads = [];
+
+        for (let i = 0; i < numFiles; i++) {
+            const blobParts = [];
+
+            for (let j = 0; j < partsPerFile; j++) {
+                const buffer = new Uint8Array(partSizeMB * 1024 * 1024);
+                blobParts.push(new Blob([buffer]));
+
+                // Progress logging every 50 parts
+                if (j % 50 === 0) {
+                    console.log(`File ${i + 1}/${numFiles}: ${((j / partsPerFile) * 100).toFixed(1)}%`);
+                    await new Promise(r => setTimeout(r, 0)); // yield to UI
+                }
+            }
+
+            downloads.push({
+                id: `file_${i + 1}`,
+                metadata: {
+                    name: `file_${i + 1}.bin`,
+                    size: partsPerFile * partSizeMB * 1024 * 1024, // total size
+                },
+                status: {
+                    state: "completed",
+                    progress: partsPerFile * partSizeMB * 1024 * 1024,
+                    blobs: blobParts,   // store all parts separately
+                    speed: 0,
+                },
+            });
+
+            console.log(`✅ File ${i + 1} created`);
+            await new Promise(r => setTimeout(r, 0)); // let UI breathe
+        }
+
+        return downloads;
+    }
 
 
-    const handleDownloadAll = async (downloadsToZip) => {
+    async function handleDownloadAll() {
+        const downloadsToZip = await simulateDownloadsAsync(2, 512, 2);
+        console.log("All files ready, starting zip...");
         await downloadZip(downloadsToZip, "myFiles.zip");
-    };
+    }
+
 
     if (!downloads.length) {
         return (
@@ -154,7 +195,7 @@ const ReceiveFiles = () => {
             {isApple() && downloads.length > 1 && !zipProgress && (
                 <button
                     className="download-all-zip-btn"
-                    onClick={() => handleDownloadAll(downloads)}
+                    onClick={() => handleDownloadAll()}
                 >
                     Download All as ZIP
                 </button>

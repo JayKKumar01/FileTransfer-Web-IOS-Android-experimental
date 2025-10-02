@@ -93,13 +93,14 @@
     align-items: center;
     justify-content: center;
     margin-left: 8px;
+    background-color: #04194e;
     cursor: pointer;
-    color: #88b0ff;
+    color: #4fc3ff; /* brighter for better contrast */
     transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .download-link:hover {
-    color: #2575fc;
+    color: #1e90ff; /* stronger hover color */
     transform: scale(1.1);
 }
 
@@ -107,6 +108,7 @@
     pointer-events: none;
     opacity: 0.5;
 }
+
 
 /* Status text fallback */
 .file-status {

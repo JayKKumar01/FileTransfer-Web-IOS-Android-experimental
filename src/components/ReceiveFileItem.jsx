@@ -1,4 +1,4 @@
-import React, { memo, useRef, useEffect, useState } from "react";
+import React, { memo, useRef, useEffect, useState, useMemo } from "react";
 import { Download } from "lucide-react";
 import { formatFileSize } from "../utils/fileUtil";
 import { isApple } from "../utils/osUtil";
@@ -7,42 +7,30 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
     const [isRemoving, setIsRemoving] = useState(false);
     const urlRef = useRef(null);
 
-    useEffect(() => {
-        if (isZipped && download) {  // ensure download exists
-            setIsRemoving(true);
-            const timer = setTimeout(() => {
-                onRemove?.(download.id); // optional chaining for safety
-            }, 300);
-            return () => clearTimeout(timer);
-        }
-    }, [isZipped, download, onRemove]);
+    const hasBlobParts = useMemo(
+        () => Array.isArray(download.status.blobs) && download.status.blobs.length > 0,
+        [download.status.blobs]
+    );
 
+    const progressPercent = useMemo(
+        () => Math.min((download.status.progress / download.metadata.size) * 100, 100).toFixed(2),
+        [download.status.progress, download.metadata.size]
+    );
 
-
-
-
-    const progressPercent = Math.min(
-        (download.status.progress / download.metadata.size) * 100,
-        100
-    ).toFixed(2);
-
-    const formatSpeed = (bytesPerSec) =>
-        !bytesPerSec || bytesPerSec <= 0 ? "" : `${formatFileSize(bytesPerSec)}/s`;
-
-    const statusText =
-        download.status.state === "receiving"
-            ? `${formatSpeed(download.status.speed)}`
+    const statusText = useMemo(() => {
+        return download.status.state === "receiving"
+            ? download.status.speed > 0
+                ? `${formatFileSize(download.status.speed)}/s`
+                : ""
             : download.status.state;
+    }, [download.status.state, download.status.speed]);
 
-    const hasBlobParts = Array.isArray(download.status.blobs) && download.status.blobs.length > 0;
-
-    // Generate blob URL once and cleanup on unmount
+    // Create blob URL once and clean up on unmount
     useEffect(() => {
         if (hasBlobParts && !urlRef.current) {
-            const fullBlob = new Blob(download.status.blobs);
-            urlRef.current = URL.createObjectURL(fullBlob);
+            const blob = new Blob(download.status.blobs);
+            urlRef.current = URL.createObjectURL(blob);
         }
-
         return () => {
             if (urlRef.current) {
                 URL.revokeObjectURL(urlRef.current);
@@ -51,16 +39,30 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
         };
     }, [download.status.blobs, hasBlobParts]);
 
+    // Trigger removal animation if zipped
+    useEffect(() => {
+        if (isZipped && download) {
+            setIsRemoving(true);
+            const timer = setTimeout(() => onRemove?.(download.id), 300);
+            return () => clearTimeout(timer);
+        }
+    }, [isZipped, download, onRemove]);
+
+    // Handle individual download click
     const handleClick = () => {
         if (!hasBlobParts) return;
 
-        if (urlRef.current) {
-            URL.revokeObjectURL(urlRef.current);
-            urlRef.current = null;
-        }
+        // Trigger download manually to avoid premature URL revocation
+        const link = document.createElement("a");
+        link.href = urlRef.current;
+        link.download = download.metadata.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
+        // Start removal animation
         setIsRemoving(true);
-        setTimeout(() => onRemove(download.id), 300);
+        setTimeout(() => onRemove?.(download.id), 300);
     };
 
     return (
@@ -74,19 +76,15 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove, isZipped }) => {
                 </span>
                 <span className="file-status">{statusText}</span>
                 {isApple() && (
-                    <a
-                        href={hasBlobParts ? urlRef.current : undefined}
-                        download={download.metadata.name}
+                    <button
                         className={`download-link ${!hasBlobParts ? "disabled" : ""}`}
                         title={hasBlobParts ? "Download & Remove" : "Not ready"}
                         onClick={handleClick}
-                        style={{
-                            pointerEvents: hasBlobParts ? "auto" : "none",
-                            opacity: hasBlobParts ? 1 : 0.5,
-                        }}
+                        disabled={!hasBlobParts}
+                        style={{ opacity: hasBlobParts ? 1 : 0.5 }}
                     >
                         <Download size={16} />
-                    </a>
+                    </button>
                 )}
             </div>
             <div className="file-row progress-bar-row">

@@ -33,7 +33,7 @@ function uint32LE(num) {
 }
 
 // --- Core function to create ZIP ---
-export async function createZip(files, onProgress) {
+export async function createZip(files, onProgress, onZipped) {
     const fileParts = []; // store Blob objects only
     const centralDirectory = [];
     let offset = 0;
@@ -100,6 +100,9 @@ export async function createZip(files, onProgress) {
         fileParts.push(new Blob([descriptor]));
         offset += descriptor.length;
 
+        // Trigger onZipped for this file
+        if (onZipped) onZipped(file.id);
+
         // Central directory entry
         const centralHeader = new Uint8Array([
             0x50,0x4b,0x01,0x02,
@@ -142,12 +145,15 @@ export async function createZip(files, onProgress) {
 }
 
 // --- Public API: download zip with progress callback ---
-export async function downloadZip(files, zipName = "files.zip", onProgress) {
-    const zipBlob = await createZip(files, onProgress);
+export async function downloadZip(files, onProgress, onZipped) {
+    const zipBlob = await createZip(files, onProgress, onZipped);
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = zipName;
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, "0");
+    const dateStr = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_${pad(now.getHours())}_${pad(now.getMinutes())}_${pad(now.getSeconds())}`;
+    a.download = `github.jaykkumar01.${dateStr}.zip`;
     a.click();
     URL.revokeObjectURL(url);
 }

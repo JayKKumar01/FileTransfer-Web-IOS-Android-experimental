@@ -4,7 +4,8 @@ import { FileContext } from "../contexts/FileContext";
 import { formatFileSize } from "../utils/fileUtil";
 import { Download } from "lucide-react";
 import {isApple} from "../utils/osUtil";
-import JSZip from "jszip"; // npm install jszip
+import JSZip from "jszip";
+import {downloadZip} from "../utils/zipUtil"; // npm install jszip
 
 
 // -------------------- Memoized Download Item --------------------
@@ -110,37 +111,9 @@ const ReceiveFiles = () => {
 
 
 
-    const handleDownloadAll = useCallback(async (downloadsToZip) => {
-        if (!downloadsToZip.length) return;
-
-        const zip = new JSZip();
-
-        downloadsToZip.forEach(d => {
-            zip.file(d.metadata.name, d.status.blob);
-            removeDownload(d.id);
-        });
-
-        setZipProgress(0);
-
-        const blob = await zip.generateAsync(
-            { type: "blob" },
-            metadata => setZipProgress(Math.floor(metadata.percent))
-        );
-
-        const now = new Date();
-        const filename = `github.jaykkumar01.${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}.zip`;
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        setTimeout(() => setZipProgress(0), 800);
-    }, [removeDownload]);
+    const handleDownloadAll = async (downloadsToZip) => {
+        await downloadZip(downloadsToZip, "myFiles.zip");
+    };
 
     if (!downloads.length) {
         return (
@@ -178,10 +151,10 @@ const ReceiveFiles = () => {
             )}
 
             {/* Download All Button */}
-            {isApple() && zipApplicableDownloads.length > 1 && !zipProgress && (
+            {isApple() && downloads.length > 1 && !zipProgress && (
                 <button
                     className="download-all-zip-btn"
-                    onClick={() => handleDownloadAll(zipApplicableDownloads)}
+                    onClick={() => handleDownloadAll(downloads)}
                 >
                     Download All as ZIP
                 </button>

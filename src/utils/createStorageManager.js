@@ -60,10 +60,8 @@ export function createStorageManager(metadata, log = () => {}) {
     async function finalize() {
         await flush();
         if (isApple()) {
-            const finalBlob = new Blob(iosBlobParts, { type });
             buffer = null;
-            iosBlobParts = null;
-            return finalBlob;
+            return iosBlobParts;
         } else {
             if (writer) await writer.close();
             buffer = null;

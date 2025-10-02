@@ -50,7 +50,7 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
                     state: "waiting",
                     progress: 0,
                     speed: 0,
-                    blob: null,
+                    blobs: null,
                 },
                 trackingManager: createTrackingManager({ totalSize: f.metadata.size }),
                 storageManager: createStorageManager(f.metadata, (msg) => {

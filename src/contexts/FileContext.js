@@ -69,9 +69,9 @@ export const FileProvider = ({ children }) => {
         setDownloads((prev) =>
             prev
                 .map((d) => {
-                    if (d.id === id && d.status.blob) {
+                    if (d.id === id && d.status.blobs) {
                         // clear the blob reference
-                        d.status.blob = null;
+                        d.status.blobs = null;
                     }
                     return d;
                 })

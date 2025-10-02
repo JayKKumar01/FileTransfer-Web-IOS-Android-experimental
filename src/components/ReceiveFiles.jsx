@@ -8,6 +8,7 @@ import {downloadZip} from "../utils/zipUtil"; // npm install jszip
 
 
 // -------------------- Memoized Download Item --------------------
+// -------------------- Memoized Download Item --------------------
 const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
     const [isRemoving, setIsRemoving] = useState(false);
 
@@ -24,18 +25,31 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
             ? `${formatSpeed(download.status.speed)}`
             : download.status.state;
 
-    const hasBlob = Boolean(download.status.blob);
+    // Check if we have any blob parts ready
+    const hasBlobParts = Array.isArray(download.status.blobs) && download.status.blobs.length > 0;
 
     const handleClick = () => {
-        if (!hasBlob) return;
+        if (!hasBlobParts) return;
 
-        if (download.status.blob) {
-            URL.revokeObjectURL(download.status.blob);
-        }
+        // Revoke URLs for all blobs if previously created
+        download.status.blobs.forEach(blobPart => {
+            if (blobPart.__url) {
+                URL.revokeObjectURL(blobPart.__url);
+            }
+        });
 
         setIsRemoving(true);
         setTimeout(() => onRemove(download.id), 300); // match animation duration
     };
+
+    // Create a single downloadable blob URL on demand
+    const downloadUrl = hasBlobParts
+        ? (() => {
+            const fullBlob = new Blob(download.status.blobs);
+            fullBlob.__url = URL.createObjectURL(fullBlob);
+            return fullBlob.__url;
+        })()
+        : undefined;
 
     return (
         <li
@@ -55,14 +69,14 @@ const ReceiveFileItem = memo(({ download, refProp, onRemove }) => {
 
                 {isApple() && (
                     <a
-                        href={hasBlob ? URL.createObjectURL(download.status.blob) : undefined}
+                        href={hasBlobParts ? downloadUrl : undefined}
                         download={download.metadata.name}
-                        className={`download-link ${!hasBlob ? "disabled" : ""}`}
-                        title={hasBlob ? "Download & Remove" : "Not ready"}
+                        className={`download-link ${!hasBlobParts ? "disabled" : ""}`}
+                        title={hasBlobParts ? "Download & Remove" : "Not ready"}
                         onClick={handleClick}
                         style={{
-                            pointerEvents: hasBlob ? "auto" : "none",
-                            opacity: hasBlob ? 1 : 0.5,
+                            pointerEvents: hasBlobParts ? "auto" : "none",
+                            opacity: hasBlobParts ? 1 : 0.5,
                         }}
                     >
                         <Download size={16} />
@@ -149,9 +163,7 @@ const ReceiveFiles = () => {
 
 
     async function handleDownloadAll() {
-        const downloadsToZip = await simulateDownloadsAsync(2, 512, 2);
-        console.log("All files ready, starting zip...");
-        await downloadZip(downloadsToZip, "myFiles.zip", (percent) => {
+        await downloadZip(downloads, "myFiles.zip", (percent) => {
             setZipProgress(percent);
             console.log("Overall ZIP progress:", percent, "%");
         });

@@ -46,13 +46,13 @@ export const useFileReceiver = (downloads, updateDownload) => {
             // -------------------- Check completion --------------------
             if (download.trackingManager.isComplete()) {
                 await pushPromise; // wait for last chunk to finish
-                const blob = await download.storageManager.finalize();
+                const blobs = await download.storageManager.finalize();
 
                 updateDownload(fileId, {
                     progress: download.trackingManager.getTotalSize(),
                     speed: 0,
-                    state:  blob ? "received" : "downloaded",
-                    blob,
+                    state:  blobs ? "received" : "downloaded",
+                    blobs,
                 });
             } else {
                 // Wait for chunk write to complete without blocking

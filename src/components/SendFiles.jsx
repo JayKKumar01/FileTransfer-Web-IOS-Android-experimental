@@ -52,22 +52,23 @@ const SendFiles = () => {
     const { files } = useContext(FileContext);
     const navigate = useNavigate();
     const itemRefs = useRef({});
-    const prevFilesLength = useRef(files.length);
+    const scrolledFiles = useRef<Set<string>>(new Set());
 
     useEffect(() => {
-        if (files.length !== prevFilesLength.current) {
-            // Scroll to the first file that is currently sending
-            const sendingFile = files.find(f => f.status.state === "sending");
-            if (sendingFile && itemRefs.current[sendingFile.id]) {
-                itemRefs.current[sendingFile.id].scrollIntoView({
-                    behavior: "smooth",
-                    block: "center",
-                });
-            }
-        }
+        // Find the first sending file that hasn't been scrolled yet
+        const sendingFile = files.find(
+            f => f.status.state === "sending" && !scrolledFiles.current.has(f.id)
+        );
 
-        // Update the previous length
-        prevFilesLength.current = files.length;
+        if (sendingFile && itemRefs.current[sendingFile.id]) {
+            itemRefs.current[sendingFile.id].scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+            });
+
+            // Mark this file as scrolled
+            scrolledFiles.current.add(sendingFile.id);
+        }
     }, [files]);
 
     if (files.length === 0) {

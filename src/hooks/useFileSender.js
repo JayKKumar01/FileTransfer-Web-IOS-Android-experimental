@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { usePeer } from "../contexts/PeerContext";
 import { isApple } from "../utils/osUtil";
+import {crc32} from "../utils/zipUtil";
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
 
@@ -25,6 +26,10 @@ export const useFileSender = (files, updateFile) => {
     const bufferOffsetRef = useRef(0);
     const fileOffsetRef = useRef(0);
 
+    // Reusable buffer for sending chunks
+    const chunkBufferRef = useRef(new ArrayBuffer(CHUNK_SIZE));
+    const chunkViewRef = useRef(new Uint8Array(chunkBufferRef.current));
+
     // -------------------- Android buffer refill --------------------
     const refillBuffer = async (file) => {
         const remaining = file.size - fileOffsetRef.current;
@@ -38,11 +43,12 @@ export const useFileSender = (files, updateFile) => {
         return true;
     };
 
-    // -------------------- Send next chunk --------------------
+    // -------------------- Send next chunk (optimized, reusable buffer) --------------------
     const sendNextChunk = async () => {
         const file = currentFileRef.current;
         if (!file || !connection) return;
 
+        // Refill buffer if needed
         if (!bufferRef.current || bufferOffsetRef.current >= bufferRef.current.byteLength) {
             const hasMore = await refillBuffer(file.file);
             if (!hasMore) return;
@@ -51,22 +57,37 @@ export const useFileSender = (files, updateFile) => {
         const remaining = bufferRef.current.byteLength - bufferOffsetRef.current;
         const size = Math.min(CHUNK_SIZE, remaining);
 
-        // ✅ slice ArrayBuffer to make a new chunk
-        const chunk = bufferRef.current.slice(
-            bufferOffsetRef.current,
-            bufferOffsetRef.current + size
-        );
+        const chunkView = chunkViewRef.current;
+        const sourceView = new Uint8Array(bufferRef.current, bufferOffsetRef.current, size);
+
+        // Initialize CRC if not done yet
+        if (file.crc === undefined) file.crc = 0;
+
+        // Copy + update CRC in a single loop
+        for (let i = 0; i < size; i++) {
+            const byte = sourceView[i];
+            chunkView[i] = byte;
+            file.crc = crc32(file.crc, [byte]);
+        }
+
         bufferOffsetRef.current += size;
 
+        const chunkIndex = Math.floor(bytesSentRef.current / CHUNK_SIZE);
+        bytesSentRef.current += size;
+
+        const isLastChunk = bytesSentRef.current >= file.metadata.size;
+
+        // Send only the used portion of the buffer
         connection.send({
             type: "chunk",
             fileId: file.id,
-            chunkIndex: Math.floor(bytesSentRef.current / CHUNK_SIZE),
-            data: chunk,
+            chunkIndex,
+            data: chunkView.subarray(0, size).buffer,
+            crc: isLastChunk ? file.crc >>> 0 : undefined,
         });
-
-        bytesSentRef.current += chunk.byteLength;
     };
+
+
 
     // -------------------- Start / Finish --------------------
     const startFileTransfer = (file) => {

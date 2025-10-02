@@ -11,7 +11,13 @@ const crcTable = (() => {
     return crcTable;
 })();
 
-function crc32(crc, buf) {
+/**
+ * Incremental CRC32 calculation
+ * @param {number} crc - previous CRC32 (0 for new)
+ * @param {Uint8Array | number[]} buf - bytes to update
+ * @returns {number} - updated CRC32
+ */
+export function crc32(crc, buf) {
     let c = crc ^ -1;
     for (let i = 0; i < buf.length; i++) {
         c = (c >>> 8) ^ crcTable[(c ^ buf[i]) & 0xff];
@@ -19,11 +25,21 @@ function crc32(crc, buf) {
     return c ^ -1;
 }
 
-function uint16LE(num) {
+/**
+ * Convert number to 2-byte little-endian array
+ * @param {number} num
+ * @returns {number[]}
+ */
+export function uint16LE(num) {
     return [num & 0xff, (num >> 8) & 0xff];
 }
 
-function uint32LE(num) {
+/**
+ * Convert number to 4-byte little-endian array
+ * @param {number} num
+ * @returns {number[]}
+ */
+export function uint32LE(num) {
     return [
         num & 0xff,
         (num >> 8) & 0xff,
@@ -44,7 +60,7 @@ export async function createZip(files, onProgress, onZipped) {
     const nameCountMap = {}; // keeps track of duplicates
 
     for (const file of files) {
-        const { blobs } = file.status;
+        const { blobs, crc } = file.status;
         let { name } = file.metadata;
         const { size } = file.metadata;
 
@@ -80,23 +96,11 @@ export async function createZip(files, onProgress, onZipped) {
         const localHeaderOffset = offset;
         offset += localHeader.length;
 
-        let crc = 0;
+        // Push all blobs directly (no CRC computation)
+        for (const blob of blobs) {
+            fileParts.push(blob);
+            offset += blob.size;
 
-        for (const blobPart of blobs) {
-            const arrayBuffer = await blobPart.arrayBuffer();
-            const data = new Uint8Array(arrayBuffer);
-
-            crc = crc32(crc, data);
-
-            fileParts.push(blobPart); // push original Blob, not Uint8Array
-            offset += data.length;
-
-            // drop references so GC can free memory
-            // (no need to zero the buffer)
-            // data.fill(0) is unnecessary
-            // arrayBuffer and Uint8Array go out of scope here
-
-            // progress callback
             processedBlobs++;
             if (onProgress && (processedBlobs % 5 === 0 || processedBlobs === totalBlobs)) {
                 const percent = Math.min((processedBlobs / totalBlobs) * 100, 100);

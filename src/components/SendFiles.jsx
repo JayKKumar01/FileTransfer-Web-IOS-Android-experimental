@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, memo } from "react";
+import React, {useContext, useEffect, useRef, memo, useMemo} from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/SendFiles.css";
 import { FileContext } from "../contexts/FileContext";
@@ -54,6 +54,18 @@ const SendFiles = () => {
     const itemRefs = useRef({});
     const scrolledFiles = useRef(new Set());
 
+    // Count of completed uploads
+    const completedCount = useMemo(
+        () => files.filter(f => f.status.state === "sent").length,
+        [files]
+    );
+
+    // Check if all files are sent
+    const allSent = useMemo(
+        () => files.length > 0 && completedCount === files.length,
+        [files, completedCount]
+    );
+
     useEffect(() => {
         // Find the first sending file that hasn't been scrolled yet
         const sendingFile = files.find(
@@ -81,6 +93,9 @@ const SendFiles = () => {
 
     return (
         <div className="send-files-container">
+            <div className="downloads-count">
+                Completed: {completedCount} / {files.length}
+            </div>
             <div className="send-files-list">
                 <ul>
                     {files.map(file => (

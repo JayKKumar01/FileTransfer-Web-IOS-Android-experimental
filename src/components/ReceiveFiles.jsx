@@ -11,10 +11,16 @@ const ReceiveFiles = () => {
     const [zipProgress, setZipProgress] = useState(0);
     const [zippedIds, setZippedIds] = useState(new Set());
 
-    const allReceived = useMemo(
-        () => downloads.length > 0 && downloads.every(d => d.status.state === "received"),
+    const completedCount = useMemo(
+        () => downloads.filter(d => d.status.state === "received").length,
         [downloads]
     );
+
+    const allReceived = useMemo(
+        () => downloads.length > 0 && completedCount === downloads.length,
+        [downloads, completedCount]
+    );
+
 
     const scrolledDownloads = useRef(new Set());
 
@@ -63,6 +69,10 @@ const ReceiveFiles = () => {
 
     return (
         <div className="receive-files-container">
+            {/* Completed count display */}
+            <div className="downloads-count">
+                Completed: {completedCount} / {downloads.length}
+            </div>
             <div className="receive-files-list">
                 <ul>
                     {downloads.map(download => (

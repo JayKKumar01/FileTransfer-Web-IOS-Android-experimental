@@ -20,7 +20,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
         const handleData = async (data) => {
             if (!data || data.type !== "chunk") return;
 
-            const { fileId, chunkIndex, data: chunk } = data;
+            const { fileId, chunkIndex, data: chunk, crc } = data;
             const download = downloadMap[fileId];
             if (!download) return;
 
@@ -48,12 +48,20 @@ export const useFileReceiver = (downloads, updateDownload) => {
                 await pushPromise; // wait for last chunk to finish
                 const blobs = await download.storageManager.finalize();
 
+                // Use CRC from the last chunk, if available
+                const finalCrc = crc !== undefined ? crc >>> 0 : undefined;
+
+                // Log the CRC for debugging
+                console.log(`✅ Final CRC received for file ${fileId}:`, finalCrc);
+
                 updateDownload(fileId, {
                     progress: download.trackingManager.getTotalSize(),
                     speed: 0,
-                    state:  blobs ? "received" : "downloaded",
+                    state: blobs ? "received" : "downloaded",
                     blobs,
+                    crc: finalCrc, // assign CRC only at the end
                 });
+
             } else {
                 // Wait for chunk write to complete without blocking
                 pushPromise.catch(console.error);

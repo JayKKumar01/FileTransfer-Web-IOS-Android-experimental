@@ -105,3 +105,5 @@ export default App;
 // get all data required for zip directly from sender
 
 // name issue if more than one are same while zipping
+
+// show count of sending and receiving currently at the top

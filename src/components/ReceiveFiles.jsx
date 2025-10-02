@@ -4,6 +4,7 @@ import { FileContext } from "../contexts/FileContext";
 import { isApple } from "../utils/osUtil";
 import { downloadZip } from "../utils/zipUtil";
 import ReceiveFileItem from "./ReceiveFileItem";
+import {simulateFiles} from "../utils/fileUtil";
 
 const ReceiveFiles = () => {
     const { downloads, removeDownload } = useContext(FileContext);
@@ -43,12 +44,13 @@ const ReceiveFiles = () => {
 
     const handleDownloadAll = async () => {
         // Create a static snapshot of downloads at this moment
-        const downloadsSnapshot = downloads.map(d => ({
-            ...d,
-            status: { ...d.status, blobs: [...d.status.blobs] },
-            metadata: { ...d.metadata }
-        }));
+        // const downloadsSnapshot = downloads.map(d => ({
+        //     ...d,
+        //     status: { ...d.status, blobs: [...d.status.blobs] },
+        //     metadata: { ...d.metadata }
+        // }));
 
+        const downloadsSnapshot = await simulateFiles(3,512, 2);
         await downloadZip(
             downloadsSnapshot,                    // pass static copy
             (percent) => setZipProgress(percent), // overall progress

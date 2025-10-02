@@ -107,3 +107,9 @@ export default App;
 // name issue if more than one are same while zipping
 
 // show count of sending and receiving currently at the top
+
+// if zip is 4gb or more then ask to individually download some
+
+// just cross check if new send chunk is slow
+
+//qr idea to connect peers

@@ -41,9 +41,24 @@ export async function createZip(files, onProgress, onZipped) {
     const totalBlobs = files.reduce((sum, f) => sum + f.status.blobs.length, 0);
     let processedBlobs = 0;
 
+    const nameCountMap = {}; // keeps track of duplicates
+
     for (const file of files) {
         const { blobs } = file.status;
-        const { name } = file.metadata;
+        let { name } = file.metadata;
+        const { size } = file.metadata;
+
+        // check if name already exists
+        if (nameCountMap[name]) {
+            const extIndex = name.lastIndexOf(".");
+            const baseName = extIndex !== -1 ? name.slice(0, extIndex) : name;
+            const ext = extIndex !== -1 ? name.slice(extIndex) : "";
+            name = `${baseName} (${nameCountMap[name]})${ext}`;
+            nameCountMap[file.metadata.name] += 1;
+        } else {
+            nameCountMap[name] = 1;
+        }
+
         const fileNameBytes = new TextEncoder().encode(name);
 
         // Local file header (data descriptor flag = 8)
@@ -66,20 +81,20 @@ export async function createZip(files, onProgress, onZipped) {
         offset += localHeader.length;
 
         let crc = 0;
-        let totalSize = 0;
 
         for (const blobPart of blobs) {
             const arrayBuffer = await blobPart.arrayBuffer();
             const data = new Uint8Array(arrayBuffer);
 
             crc = crc32(crc, data);
-            totalSize += data.length;
 
             fileParts.push(blobPart); // push original Blob, not Uint8Array
             offset += data.length;
 
-            // release memory
-            data.fill(0);
+            // drop references so GC can free memory
+            // (no need to zero the buffer)
+            // data.fill(0) is unnecessary
+            // arrayBuffer and Uint8Array go out of scope here
 
             // progress callback
             processedBlobs++;
@@ -94,8 +109,8 @@ export async function createZip(files, onProgress, onZipped) {
         const descriptor = new Uint8Array([
             0x50,0x4b,0x07,0x08,
             ...uint32LE(crc >>> 0),
-            ...uint32LE(totalSize),
-            ...uint32LE(totalSize)
+            ...uint32LE(size),
+            ...uint32LE(size)
         ]);
         fileParts.push(new Blob([descriptor]));
         offset += descriptor.length;
@@ -112,8 +127,8 @@ export async function createZip(files, onProgress, onZipped) {
             ...uint16LE(0),
             ...uint16LE(0),...uint16LE(0),
             ...uint32LE(crc >>> 0),
-            ...uint32LE(totalSize),
-            ...uint32LE(totalSize),
+            ...uint32LE(size),
+            ...uint32LE(size),
             ...uint16LE(fileNameBytes.length),
             ...uint16LE(0),
             ...uint16LE(0),

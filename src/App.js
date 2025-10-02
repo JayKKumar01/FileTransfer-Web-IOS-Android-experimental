@@ -98,3 +98,10 @@ export default App;
 
 // work around zip, find a way anyhow, maybe just keep appending small small zip or something
 //scroll optimization, per second maybe, or only when new file is added
+
+//crc can be calculated at the receiving time to avoid at zipping
+// use some dsa to reduce time complexity
+
+// get all data required for zip directly from sender
+
+// name issue if more than one are same while zipping

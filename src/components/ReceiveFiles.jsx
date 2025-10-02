@@ -4,7 +4,6 @@ import { FileContext } from "../contexts/FileContext";
 import { formatFileSize } from "../utils/fileUtil";
 import { Download } from "lucide-react";
 import {isApple} from "../utils/osUtil";
-import JSZip from "jszip";
 import {downloadZip} from "../utils/zipUtil"; // npm install jszip
 
 
@@ -152,7 +151,15 @@ const ReceiveFiles = () => {
     async function handleDownloadAll() {
         const downloadsToZip = await simulateDownloadsAsync(2, 512, 2);
         console.log("All files ready, starting zip...");
-        await downloadZip(downloadsToZip, "myFiles.zip");
+        await downloadZip(downloadsToZip, "myFiles.zip", (percent) => {
+            setZipProgress(percent);
+            console.log("Overall ZIP progress:", percent, "%");
+        });
+
+        setTimeout(() => {
+            setZipProgress(0);
+        }, 500);
+
     }
 
 

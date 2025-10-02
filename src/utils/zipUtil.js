@@ -1,6 +1,3 @@
-// zipUtil.js
-// Assumes files: [{ metadata: { name }, status: { blobs: [Blob, ...] } }, ...]
-
 // --- CRC32 TABLE (precomputed) ---
 const crcTable = (() => {
     let c, crcTable = [];
@@ -35,12 +32,12 @@ function uint32LE(num) {
     ];
 }
 
-export async function createZip(files) {
+// --- Core function to create ZIP ---
+export async function createZip(files, onProgress) {
     const fileData = [];
     const centralDirectory = [];
     let offset = 0;
 
-    // Total blobs across all files
     const totalBlobs = files.reduce((sum, f) => sum + f.status.blobs.length, 0);
     let processedBlobs = 0;
 
@@ -49,7 +46,7 @@ export async function createZip(files) {
         const { name } = file.metadata;
         const fileNameBytes = new TextEncoder().encode(name);
 
-        // Local file header with placeholders (data descriptor flag = 8)
+        // Local file header (data descriptor flag = 8)
         const localHeader = new Uint8Array([
             0x50,0x4b,0x03,0x04,
             ...uint16LE(20),
@@ -63,14 +60,14 @@ export async function createZip(files) {
             ...uint16LE(0),
             ...fileNameBytes
         ]);
-
         fileData.push(localHeader);
         const localHeaderOffset = offset;
         offset += localHeader.length;
 
-        // Process each blob part sequentially
         let crc = 0;
         let totalSize = 0;
+
+        // Process each blob part
         for (const blobPart of blobs) {
             const arrayBuffer = await blobPart.arrayBuffer();
             const data = new Uint8Array(arrayBuffer);
@@ -82,9 +79,9 @@ export async function createZip(files) {
 
             // Update global progress
             processedBlobs++;
-            if (processedBlobs % 5 === 0 || processedBlobs === totalBlobs) {
-                const percent = ((processedBlobs / totalBlobs) * 100).toFixed(1);
-                console.log(`Zip progress: ${percent}%`);
+            if (onProgress && (processedBlobs % 5 === 0 || processedBlobs === totalBlobs)) {
+                const percent = Math.min(((processedBlobs / totalBlobs) * 100), 100);
+                onProgress(Number(percent.toFixed(2))); // 2 decimal places
                 await Promise.resolve(); // yield to UI
             }
         }
@@ -140,11 +137,9 @@ export async function createZip(files) {
     return new Blob(allParts, { type: "application/zip" });
 }
 
-
-
-// Public API: download zip
-export async function downloadZip(files, zipName = "files.zip") {
-    const zipBlob = await createZip(files);
+// --- Public API: download zip with progress callback ---
+export async function downloadZip(files, zipName = "files.zip", onProgress) {
+    const zipBlob = await createZip(files, onProgress);
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement("a");
     a.href = url;

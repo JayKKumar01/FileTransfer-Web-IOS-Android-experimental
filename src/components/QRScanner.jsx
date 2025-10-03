@@ -1,64 +1,44 @@
-import React, { useContext, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import QrScanner from "qr-scanner";
 import { ArrowLeft } from "lucide-react";
 import "../styles/QRScanner.css";
-import { LogContext } from "../contexts/LogContext";
 
 const QRScanner = ({ onScan, onBack, startScannerImmediately = false }) => {
     const videoRef = useRef(null);
     const qrScannerRef = useRef(null);
-    const { pushLog } = useContext(LogContext);
 
-    const log = (msg) => {
-        console.log(msg);
-        pushLog(msg);
-    };
-
-    const startScanner = async () => {
+    const startScanner = useCallback(async () => {
         if (!videoRef.current) return;
 
         qrScannerRef.current = new QrScanner(
             videoRef.current,
             (result) => {
-                let value;
-                if (typeof result === "string") value = result;
-                else if (result?.data) value = result.data;
-                else value = String(result);
-
-                log("Final QR value: " + value);
+                const value = result?.data ?? (typeof result === "string" ? result : String(result));
                 onScan(value);
                 qrScannerRef.current?.stop();
             },
             {
                 highlightScanRegion: true,
                 highlightCodeOutline: true,
-                preferredCamera: "environment", // back camera
+                preferredCamera: "environment", // Back camera
             }
         );
 
         try {
             await qrScannerRef.current.start();
-
-            // Explicit play needed for iOS
-            if (videoRef.current) {
-                await videoRef.current.play().catch(() => {
-                    console.warn("iOS video autoplay requires user interaction");
-                });
-            }
         } catch (err) {
-            log("Camera permission denied or unavailable: " + err);
+            console.warn("Camera permission denied or unavailable:", err);
         }
-    };
+    }, [onScan]);
 
     useEffect(() => {
-        if (startScannerImmediately) {
-            startScanner();
-        }
+        if (startScannerImmediately) startScanner();
 
         return () => {
             qrScannerRef.current?.stop();
+            qrScannerRef.current = null;
         };
-    }, [startScannerImmediately]);
+    }, [startScannerImmediately, startScanner]);
 
     return (
         <div className="qr-scanner-container">

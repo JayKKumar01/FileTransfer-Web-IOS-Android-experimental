@@ -1,9 +1,10 @@
 import "../styles/PeerConnect.css";
 import React, { useState, useEffect, useCallback } from "react";
-import { usePeer } from "../contexts/PeerContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Copy, Check, Camera } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
+
+import { usePeer } from "../contexts/PeerContext";
 import QRScanner from "./QRScanner";
 import { isAndroid } from "../utils/osUtil";
 
@@ -14,42 +15,55 @@ const PeerConnect = () => {
     const [copied, setCopied] = useState(false);
     const [showScanner, setShowScanner] = useState(false);
     const [hasAutoConnected, setHasAutoConnected] = useState(false);
+
     const navigate = useNavigate();
     const location = useLocation();
-
     const android = isAndroid();
 
-    const connectWithId = useCallback((id) => {
-        if (!id) return;
+    // --- Trim scanned or input value to extract peerId ---
+    const trimResult = (result) => {
+        if (!result) return undefined;
+        let id = result.toString().trim();
 
-        let finalId = id;
-
-        // If the scanned value is a full URL, extract the remoteId param
         try {
             const url = new URL(id);
-            const urlRemoteId = url.searchParams.get("remoteId");
-            if (urlRemoteId) finalId = urlRemoteId;
+            let remoteId = url.searchParams.get("remoteId");
+            if (!remoteId && url.hash) {
+                const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+                remoteId = hashParams.get("remoteId");
+            }
+            if (remoteId) id = remoteId;
         } catch {
-            // Not a valid URL, keep id as is
+            // Not a URL, keep as-is
         }
 
-        // Clean any extra quotes or spaces
-        finalId = finalId.toString().trim().replace(/^["']|["']$/g, "");
+        return id.replace(/^["']|["']$/g, "");
+    };
 
-        setTargetId(finalId);
-        setShowScanner(false);
+    // --- Unified connect function ---
+    const connectWithId = useCallback(
+        (id) => {
+            if (!isPeerReady) return; // Don't do anything until peer is ready
 
-        setStatus("Connecting...");
-        connectToPeer(finalId, (state) => {
-            if (state?.startsWith("Retrying")) setStatus(state);
-            else if (state === "failed") setStatus("Connect");
-        });
-    }, [connectToPeer]);
+            const finalId = trimResult(id);
+            if (!finalId) return;
 
+            setTargetId(finalId);
+            setShowScanner(false);
+            setStatus("Connecting...");
 
-    // Auto-connect from URL only once
+            connectToPeer(finalId, (state) => {
+                if (state?.startsWith("Retrying")) setStatus(state);
+                else if (state === "failed") setStatus("Connect");
+            });
+        },
+        [connectToPeer, isPeerReady]
+    );
+
+    // --- Auto-connect from URL query (once) ---
     useEffect(() => {
-        if (hasAutoConnected) return;
+        if (!isPeerReady || hasAutoConnected) return;
+
         const params = new URLSearchParams(location.search);
         const urlRemoteId = params.get("remoteId");
 
@@ -57,38 +71,43 @@ const PeerConnect = () => {
             connectWithId(urlRemoteId);
             setHasAutoConnected(true);
         }
-    }, [location.search, connectWithId, hasAutoConnected]);
+    }, [location.search, connectWithId, hasAutoConnected, isPeerReady]);
 
-    // Navigate to files page on successful connection
+    // --- Navigate to files page on successful connection ---
     useEffect(() => {
-        if (!isConnectionReady) return;
+        if (!isPeerReady || !isConnectionReady) return;
+
         setTargetId("");
         setStatus("Connected ✅");
+
         const timer = setTimeout(() => navigate("/files"), 500);
         return () => clearTimeout(timer);
-    }, [isConnectionReady, navigate]);
+    }, [isPeerReady, isConnectionReady, navigate]);
 
     if (!isPeerReady) return <p>Connecting to server...</p>;
 
+    // --- Event handlers ---
     const handleKeyDown = (e) => {
         if (e.key === "Enter" && status === "Connect" && targetId) connectWithId(targetId);
     };
 
     const copyToClipboard = () => {
         if (!peerId) return;
-        navigator.clipboard.writeText(peerId)
+        const shareableURL = `${window.location.origin}${window.location.pathname}#?remoteId=${peerId}`;
+        navigator.clipboard.writeText(shareableURL)
             .then(() => {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 800);
             })
-            .catch(() => alert("Failed to copy ID"));
+            .catch(() => alert("Failed to copy link"));
     };
 
     return (
         <div className="PeerConnect">
+            {/* QR Scanner (Android only) */}
             {showScanner && android && (
                 <QRScanner
-                    onScan={connectWithId}
+                    onScan={(result) => connectWithId(result)}
                     onBack={() => setShowScanner(false)}
                     startScannerImmediately
                 />
@@ -96,22 +115,20 @@ const PeerConnect = () => {
 
             {!showScanner && (
                 <>
+                    {/* Scan button (Android only) */}
                     {android && (
                         <div className="scan-wrapper">
-                            <button
-                                className="scan-btn"
-                                onClick={() => setShowScanner(true)}
-                            >
+                            <button className="scan-btn" onClick={() => setShowScanner(true)}>
                                 <Camera size={24} />
                             </button>
                             <span className="scan-label">Scan QR</span>
                         </div>
                     )}
 
+                    {/* QR Code for sharing */}
                     {peerId && (
                         <div className="qr-container">
                             <QRCodeCanvas
-                                // Encode the full shareable URL instead of just peerId
                                 value={`${window.location.origin}${window.location.pathname}#?remoteId=${peerId}`}
                                 size={120}
                                 bgColor="#1a1a1a"
@@ -120,23 +137,22 @@ const PeerConnect = () => {
                         </div>
                     )}
 
+                    {/* Display peer ID with copy button */}
                     <p className="id-row">
                         Your ID: <b>{peerId}</b>
-                        <button
-                            className={`copy-btn ${copied ? "copied" : ""}`}
-                            onClick={copyToClipboard}
-                        >
+                        <button className={`copy-btn ${copied ? "copied" : ""}`} onClick={copyToClipboard}>
                             {copied ? <Check size={16} /> : <Copy size={16} />}
                         </button>
                     </p>
 
+                    {/* Connection input */}
                     {!isConnectionReady ? (
                         <div className="connect-inputs">
                             <input
                                 type="tel"
                                 pattern="[0-9]*"
                                 inputMode="numeric"
-                                placeholder="Enter peer ID"
+                                placeholder="Enter peer ID or URL"
                                 value={targetId}
                                 onChange={(e) => setTargetId(e.target.value)}
                                 onKeyDown={handleKeyDown}

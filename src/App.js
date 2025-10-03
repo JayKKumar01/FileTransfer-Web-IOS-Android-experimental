@@ -120,3 +120,8 @@ export default App;
 // qr idea to connect peers
 
 // copy share link
+
+//think of zip, if no connection give option for the current ones
+
+// map for each file each chunk, on ack received, marked as success, on reconnection resume from that only, one connection loose
+//just pause, send full map to receiver on metadata so that it does not duplicate the chunk for which sender was not notified

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import Peer from "peerjs";
 import { LogContext } from "./LogContext";
+import {isAndroid, isApple} from "../utils/osUtil";
 
 const PREFIX = "jaykkumar01-ft-web-ios-android-";
 const RANDOM_ID = Math.floor(100000 + Math.random() * 900000);
@@ -16,6 +17,7 @@ export const PeerProvider = ({ children }) => {
     const [isPeerReady, setIsPeerReady] = useState(false);
     const [isConnectionReady, setIsConnectionReady] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState("idle"); // idle | connecting | connected | retrying
+    const [peerDevice, setPeerDevice] = useState(null);
 
     const refs = useRef({
         peer: null,
@@ -50,6 +52,10 @@ export const PeerProvider = ({ children }) => {
         setConnectionStatus("connecting");
 
         conn.on("open", () => {
+            conn.send({
+                type: "deviceInfo",
+                device: isApple() ? "iOS" : isAndroid() ? "Android" : "unknown",
+            });
             const rid = conn.peer.replace(PREFIX, "");
             log(`Connected to ${rid}`);
             setRemoteId(rid);
@@ -59,6 +65,13 @@ export const PeerProvider = ({ children }) => {
             refs.current.lastConnectedPeerId = rid;
             refs.current.retryCount = 0;
         });
+
+        conn.on("data", (data) => {
+            if (data.type === "deviceInfo") {
+                setPeerDevice(data.device);
+                log(`Received device info: ${data.device}`);
+            }
+        })
 
         conn.on("close", () => {
             log("Connection closed");
@@ -170,6 +183,7 @@ export const PeerProvider = ({ children }) => {
                 initializePeer,
                 connectToPeer,
                 reconnect,
+                peerDevice,
             }}
         >
             {children}

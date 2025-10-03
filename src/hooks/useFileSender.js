@@ -15,7 +15,6 @@ export const useFileSender = (files, updateFile) => {
     const { connection, isConnectionReady } = usePeer();
 
     const currentFileRef = useRef(null);
-    const isSendingRef = useRef(false);
     const uiThrottleRef = useRef(0);
 
     // -------------------- Refill buffer --------------------
@@ -81,7 +80,6 @@ export const useFileSender = (files, updateFile) => {
         file._fileOffset = 0;
 
         currentFileRef.current = file;
-        isSendingRef.current = true;
         uiThrottleRef.current = 0;
 
         updateFile(file.id, { state: "sending", progress: 0, speed: 0 });
@@ -103,7 +101,6 @@ export const useFileSender = (files, updateFile) => {
 
         // clear refs
         currentFileRef.current = null;
-        isSendingRef.current = false;
 
         console.log(`🎉 File transfer completed: "${file.metadata.name}"`);
     };
@@ -149,7 +146,7 @@ export const useFileSender = (files, updateFile) => {
 
     // -------------------- Effects --------------------
     useEffect(() => {
-        if (!isConnectionReady || isSendingRef.current) return;
+        if (!isConnectionReady || currentFileRef.current != null) return;
         const nextFile = files.find((f) => f.status.state === "waiting");
         if (nextFile) startFileTransfer(nextFile);
     }, [files, isConnectionReady]);

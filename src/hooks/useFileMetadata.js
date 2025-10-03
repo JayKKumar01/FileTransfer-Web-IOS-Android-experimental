@@ -52,7 +52,7 @@ export const useFileMetadata = (files, updateFile, addDownloads) => {
                     speed: 0,
                     blobs: null,
                 },
-                trackingManager: createTrackingManager({ totalSize: f.metadata.size }),
+                trackingManager: createTrackingManager(f.metadata.size),
                 storageManager: createStorageManager(f.metadata, (msg) => {
                     console.log(msg);       // optional console log
                 }),

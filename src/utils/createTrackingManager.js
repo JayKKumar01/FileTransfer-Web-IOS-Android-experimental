@@ -1,11 +1,4 @@
-/**
- * Creates a tracking manager for a single download
- * Optimized for performance and minimal memory overhead
- * @param {Object} options
- * @param {number} options.totalSize - Total size of the file in bytes
- * @param {number} [options.uiUpdateInterval=166] - Minimum ms between UI updates (~6 FPS)
- */
-export function createTrackingManager({ totalSize, uiUpdateInterval = 1000 / 6 }) {
+export function createTrackingManager(totalSize) {
     let bytesReceived = 0;
     let lastBytes = 0;
     let lastTime = performance.now();
@@ -60,7 +53,7 @@ export function createTrackingManager({ totalSize, uiUpdateInterval = 1000 / 6 }
     /**
      * Check if enough time has passed to update the UI
      */
-    function shouldUpdateUI() {
+    function shouldUpdateUI(uiUpdateInterval) {
         const now = performance.now();
         if (now - uiThrottle >= uiUpdateInterval) {
             uiThrottle = now;

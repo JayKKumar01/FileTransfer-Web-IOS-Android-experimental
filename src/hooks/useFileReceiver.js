@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { usePeer } from "../contexts/PeerContext";
 
-const UPS = 6;
+const UPS = 3;
 const UI_UPDATE_INTERVAL = 1000 / UPS;
 
 export const useFileReceiver = (downloads, updateDownload) => {

@@ -92,23 +92,10 @@ export default App;
 
 // don't delete my comments
 
-//if one file then download that directly using url object, if multiple then zip, if android then mulitple downloads
 //reconnect, even when connection is closed, mark who entered targetId to connect
 // reconnect is pending too, if connection is not null, then reconnect and connect to peer, on connection no need
 
-// work around zip, find a way anyhow, maybe just keep appending small small zip or something
-//scroll optimization, per second maybe, or only when new file is added
-
-//crc can be calculated at the receiving time to avoid at zipping
 // use some dsa to reduce time complexity
-
-// get all data required for zip directly from sender
-
-// name issue if more than one are same while zipping
-
-// show count of sending and receiving currently at the top
-
-// if zip is 4gb or more then ask to individually download some
 
 // just cross check if new send chunk is slow
 

@@ -4,22 +4,20 @@ import { usePeer } from "../contexts/PeerContext";
 import { useNavigate } from "react-router-dom";
 import { Copy, Check, Camera } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
-import QRScanner from "./QRScanner"; // QR scanner component
+import QRScanner from "./QRScanner";
 
 const PeerConnect = () => {
     const { peerId, connectToPeer, isPeerReady, isConnectionReady, remoteId } = usePeer();
     const [targetId, setTargetId] = useState("");
     const [status, setStatus] = useState("Connect");
     const [copied, setCopied] = useState(false);
-    const [showScanner, setShowScanner] = useState(false); // toggle scanner
+    const [showScanner, setShowScanner] = useState(false);
     const navigate = useNavigate();
 
-    // Navigate to /files once connection is ready
     useEffect(() => {
         if (isConnectionReady) {
             setTargetId("");
             setStatus("Connected ✅");
-
             const timer = setTimeout(() => navigate("/files"), 500);
             return () => clearTimeout(timer);
         }
@@ -27,10 +25,10 @@ const PeerConnect = () => {
 
     if (!isPeerReady) return <p>Connecting to server...</p>;
 
-    const handleConnect = () => {
-        if (!targetId) return;
+    const handleConnect = (id = targetId) => {
+        if (!id) return;
         setStatus("Connecting...");
-        connectToPeer(targetId, (state) => {
+        connectToPeer(id, (state) => {
             if (state?.startsWith("Retrying")) setStatus(state);
             else if (state === "failed") setStatus("Connect");
         });
@@ -51,9 +49,21 @@ const PeerConnect = () => {
     };
 
     const handleScan = (scannedId) => {
-        setTargetId(scannedId);
+        let id = scannedId;
+
+        try {
+            // Try parsing JSON (since QR value is JSON.stringify(peerId))
+            id = JSON.parse(scannedId);
+        } catch {
+            console.warn("Failed to parse JSON from QR");
+        }
+
+        // Sanitize: remove any leading/trailing whitespace or quotes
+        id = id.toString().trim().replace(/^["']|["']$/g, "");
+
+        setTargetId(id);
         setShowScanner(false);
-        handleConnect(); // connect immediately after scan
+        handleConnect(id); // connect immediately with clean string
     };
 
     return (
@@ -62,11 +72,15 @@ const PeerConnect = () => {
                 <QRScanner
                     onScan={handleScan}
                     onBack={() => setShowScanner(false)}
+                    startScannerImmediately={true} // <-- add this prop
                 />
             ) : (
                 <>
                     {/* Scan QR button at top-right */}
-                    <button className="scan-btn" onClick={() => setShowScanner(true)}>
+                    <button
+                        className="scan-btn"
+                        onClick={() => setShowScanner(true)} // user click triggers scanner
+                    >
                         <Camera size={16} /> Scan QR
                     </button>
 
@@ -79,7 +93,6 @@ const PeerConnect = () => {
                                 bgColor="#1a1a1a"
                                 fgColor="#ffffff"
                             />
-
                         </div>
                     )}
 
@@ -108,7 +121,7 @@ const PeerConnect = () => {
                                 disabled={status !== "Connect"}
                             />
                             <button
-                                onClick={handleConnect}
+                                onClick={() => handleConnect()}
                                 disabled={!targetId || status !== "Connect"}
                             >
                                 {status}

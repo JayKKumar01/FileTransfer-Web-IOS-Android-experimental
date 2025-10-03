@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import "../styles/QRScanner.css";
 import { LogContext } from "../contexts/LogContext";
 
-const QRScanner = ({ onScan, onBack }) => {
+const QRScanner = ({ onScan, onBack, startScannerImmediately = false }) => {
     const videoRef = useRef(null);
     const qrScannerRef = useRef(null);
     const { pushLog } = useContext(LogContext);
@@ -14,45 +14,51 @@ const QRScanner = ({ onScan, onBack }) => {
         pushLog(msg);
     };
 
-    useEffect(() => {
+    const startScanner = async () => {
         if (!videoRef.current) return;
-
-        const handleScanResult = (result) => {
-            // Safely extract string value
-            let value;
-            if (typeof result === "string") {
-                value = result;
-            } else if (result && typeof result.data === "string") {
-                value = result.data;
-            } else {
-                log("Unknown QR scan result object: " + JSON.stringify(result));
-                value = String(result);
-            }
-
-            log("Final QR value: " + value);
-            onScan(value);
-
-            // Stop scanner after successful scan
-            qrScannerRef.current?.stop();
-        };
 
         qrScannerRef.current = new QrScanner(
             videoRef.current,
-            handleScanResult,
+            (result) => {
+                let value;
+                if (typeof result === "string") value = result;
+                else if (result?.data) value = result.data;
+                else value = String(result);
+
+                log("Final QR value: " + value);
+                onScan(value);
+                qrScannerRef.current?.stop();
+            },
             {
                 highlightScanRegion: true,
                 highlightCodeOutline: true,
+                preferredCamera: "environment", // back camera
             }
         );
 
-        qrScannerRef.current.start().catch((err) => {
+        try {
+            await qrScannerRef.current.start();
+
+            // Explicit play needed for iOS
+            if (videoRef.current) {
+                await videoRef.current.play().catch(() => {
+                    console.warn("iOS video autoplay requires user interaction");
+                });
+            }
+        } catch (err) {
             log("Camera permission denied or unavailable: " + err);
-        });
+        }
+    };
+
+    useEffect(() => {
+        if (startScannerImmediately) {
+            startScanner();
+        }
 
         return () => {
             qrScannerRef.current?.stop();
         };
-    }, [onScan]);
+    }, [startScannerImmediately]);
 
     return (
         <div className="qr-scanner-container">
@@ -63,7 +69,7 @@ const QRScanner = ({ onScan, onBack }) => {
                 <h2 className="scanner-title">Scan QR Code</h2>
             </header>
             <div className="scanner-wrapper">
-                <video ref={videoRef} className="qr-video" />
+                <video ref={videoRef} className="qr-video" playsInline />
                 <div className="scan-overlay" />
             </div>
         </div>

@@ -1,6 +1,6 @@
 /* Root container */
 .PeerConnect {
-    position: relative; /* for absolute positioning of scan button */
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -10,38 +10,62 @@
     padding: 1rem;
     background-color: #1a1a1a;
     border-radius: 12px;
-    color: #ffffff;
+    color: #fff;
     overflow-y: auto;
     text-align: center;
 }
 
-/* Scan QR button - top-right */
-.PeerConnect .scan-btn {
+/* Wrapper for scan button + label */
+.PeerConnect .scan-wrapper {
     position: absolute;
     top: 1rem;
     right: 1rem;
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.4rem 0.8rem;
+    margin-right: 1rem;
+}
+
+/* Scan button - modern, simple */
+.PeerConnect .scan-btn {
+    width: 80%;
+    height: 80%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
-    border: none;
-    background-color: #2575fc;
-    color: #fff;
-    font-size: 0.9rem;
+    border: 1px solid #fff;       /* thin white border */
+    background: rgba(37, 117, 252, 0.2);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 8px rgba(37, 117, 252, 0.2);
+    color: #2575fc;
+    font-size: 1.2rem;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
+    transition: all 0.3s ease;
 }
 
 .PeerConnect .scan-btn:hover {
-    background-color: #1a5edb;
+    background: rgba(37, 117, 252, 0.3);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(37, 117, 252, 0.25);
+    transform: translateY(-1px);
 }
 
 .PeerConnect .scan-btn:active {
-    transform: scale(0.97);
+    transform: scale(0.95);
+    box-shadow: 0 1px 6px rgba(37, 117, 252, 0.2);
 }
 
-/* QR Code wrapper */
+/* Scan label */
+.PeerConnect .scan-label {
+    font-size: 0.85rem;
+    color: #fff;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* QR container */
 .PeerConnect .qr-container {
     margin-bottom: 1rem;
     display: flex;
@@ -49,7 +73,7 @@
     align-items: center;
 }
 
-/* Your ID row */
+/* Peer ID row */
 .PeerConnect .id-row {
     display: flex;
     align-items: center;
@@ -61,16 +85,23 @@
     word-break: break-word;
 }
 
+/* Input & button container */
+.PeerConnect .connect-inputs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* Input field */
 .PeerConnect input {
     width: 100%;
     max-width: 280px;
     padding: 0.6rem 0.8rem;
-    margin-bottom: 1rem;
     border-radius: 8px;
     border: 1px solid #333;
     background-color: #121212;
-    color: #ffffff;
+    color: #fff;
     font-size: 1rem;
     outline: none;
     transition: border 0.2s ease;
@@ -84,13 +115,13 @@
     color: #888;
 }
 
-/* Buttons (general) */
+/* Buttons */
 .PeerConnect button {
     padding: 0.6rem 1.2rem;
     border-radius: 8px;
     border: none;
     background-color: #2575fc;
-    color: white;
+    color: #fff;
     font-size: 1rem;
     cursor: pointer;
     transition: background-color 0.2s ease, transform 0.1s ease;
@@ -123,7 +154,6 @@
     color: #fff;
 }
 
-/* Copy animation */
 .PeerConnect .copy-btn.copied {
     background-color: #28a745 !important;
     color: #fff !important;
@@ -142,30 +172,20 @@
     .PeerConnect {
         padding: 0.8rem;
     }
-
-    .PeerConnect .qr-container {
-        margin-bottom: 0.8rem;
-    }
-
-    .PeerConnect input {
-        width: 95%;
-        font-size: 0.95rem;
-    }
-
-    .PeerConnect button {
-        font-size: 0.95rem;
-        padding: 0.5rem 1rem;
-    }
-
-    .PeerConnect .copy-btn {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-    }
-
-    .PeerConnect .scan-btn {
-        top: 0.8rem;
+    .PeerConnect .qr-container { margin-bottom: 0.8rem; }
+    .PeerConnect input { width: 95%; font-size: 0.95rem; }
+    .PeerConnect button { font-size: 0.95rem; padding: 0.5rem 1rem; }
+    .PeerConnect .copy-btn { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
+    .PeerConnect .scan-wrapper {
+        top: 1rem;
         right: 0.8rem;
-        font-size: 0.8rem;
-        padding: 0.35rem 0.6rem;
+        gap: 0.25rem;
+        margin-right: 1rem;
     }
+    .PeerConnect .scan-btn {
+        width: 55px;
+        height: 55px;
+        font-size: 1rem;
+    }
+    .PeerConnect .scan-label { font-size: 0.75rem; }
 }

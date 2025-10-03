@@ -5,7 +5,7 @@ import PeerConnect from "./components/PeerConnect";
 import FileInput from "./components/FileInput";
 import { LogContext } from "./contexts/LogContext";
 import { useWakeLock } from "./utils/wakeLock";
-import {isApple, preventPinchZoom, setVisibleHeight} from "./utils/osUtil";
+import { isApple, preventPinchZoom, setVisibleHeight } from "./utils/osUtil";
 import { usePeer } from "./contexts/PeerContext";
 import TabBar from "./components/TabBar";
 import SendFiles from "./components/SendFiles";
@@ -19,12 +19,25 @@ function App() {
     const navigate = useNavigate();
     const location = useLocation();
     const [initialized, setInitialized] = useState(false);
+    const [pendingRemoteId, setPendingRemoteId] = useState(null); // store remoteId until user clicks
 
+    // Log platform
     useEffect(() => {
         pushLog(isApple() ? "Running on iOS" : "Running on non-iOS");
     }, [pushLog]);
 
+    // Detect remoteId from URL
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const remoteId = params.get("remoteId");
 
+        if (remoteId) {
+            pushLog(`Remote ID found in URL: ${remoteId}`);
+            setPendingRemoteId(remoteId); // save for later use
+        }
+    }, [location.search, pushLog]);
+
+    // Handle viewport height
     useEffect(() => {
         const updateHeight = () => setVisibleHeight(pushLog);
         updateHeight();
@@ -32,17 +45,26 @@ function App() {
         return () => window.removeEventListener("resize", updateHeight);
     }, [pushLog]);
 
+    // Prevent pinch zoom
     useEffect(() => preventPinchZoom(pushLog), []);
 
+    // Scroll logs to bottom
     useEffect(() => {
         if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
     }, [logMessages]);
 
+    // Keep screen awake & initialize peer
     const handleButtonClick = async () => {
         await requestUserWakeLock();
         initializePeer();
         setInitialized(true);
-        navigate("/connect");
+
+        // Navigate to /connect with remoteId if present
+        if (pendingRemoteId) {
+            navigate(`/connect?remoteId=${pendingRemoteId}`);
+        } else {
+            navigate("/connect");
+        }
     };
 
     // Routes where TabBar should be shown
@@ -92,9 +114,9 @@ export default App;
 
 // don't delete my comments
 
-//reconnect, even when connection is closed, mark who entered targetId to connect
+// reconnect, even when connection is closed, mark who entered targetId to connect
 // reconnect is pending too, if connection is not null, then reconnect and connect to peer, on connection no need
 
-//qr idea to connect peers
+// qr idea to connect peers
 
 // copy share link

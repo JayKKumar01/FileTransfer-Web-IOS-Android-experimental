@@ -4,7 +4,7 @@ import { isApple } from "../utils/osUtil";
 import { crc32 } from "../utils/zipUtil";
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
-const APPLE_BUFFER_SIZE = 2 * 1024 * 1024; // 2 MB for iOS/macOS
+const APPLE_BUFFER_SIZE = 4 * 1024 * 1024; // 2 MB for iOS/macOS
 const DEFAULT_BUFFER_SIZE = 8 * 1024 * 1024; // 8 MB for Android/others
 const BUFFER_SIZE = isApple() ? APPLE_BUFFER_SIZE : DEFAULT_BUFFER_SIZE;
 

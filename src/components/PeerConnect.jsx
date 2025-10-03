@@ -74,11 +74,12 @@ const PeerConnect = () => {
                     {peerId && (
                         <div className="qr-container">
                             <QRCodeCanvas
-                                value={`${peerId}`}
+                                value={JSON.stringify(peerId)}
                                 size={120}
                                 bgColor="#1a1a1a"
                                 fgColor="#ffffff"
                             />
+
                         </div>
                     )}
 

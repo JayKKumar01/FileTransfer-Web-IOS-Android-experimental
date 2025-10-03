@@ -53,19 +53,16 @@
 .scanner-wrapper {
     position: relative;
     width: 100%;
-    padding-top: 100%; /* 1:1 Aspect ratio */
     background-color: #000;
     overflow: hidden;
+    border-radius: 0 0 12px 12px;
 }
 
+/* Video */
 .qr-video {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    border-radius: 0 0 12px 12px;
+    object-fit: cover; /* default for mobile */
 }
 
 /* Scan overlay */
@@ -82,10 +79,25 @@
     pointer-events: none;
 }
 
-/* Responsive */
+/* Responsive adjustments */
 @media (max-width: 480px) {
-    .qr-scanner-container {
-        margin: 1rem;
+    .scanner-wrapper {
+        padding-top: 100%; /* maintain square for mobile */
+        position: relative;
+    }
+
+    .qr-video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* fill square */
+    }
+
+    .scan-overlay {
+        width: 70%;
+        height: 70%;
     }
 
     .scanner-title {
@@ -96,9 +108,22 @@
         padding: 0.35rem 0.6rem;
         font-size: 0.85rem;
     }
+}
+
+/* Desktop: maintain video ratio, prevent cropping */
+@media (min-width: 481px) {
+    .scanner-wrapper {
+        padding-top: 0; /* remove square padding */
+    }
+
+    .qr-video {
+        height: auto;
+        max-height: 480px;
+        object-fit: contain; /* show full video */
+    }
 
     .scan-overlay {
-        width: 70%;
-        height: 70%;
+        width: 60%;
+        height: 60%;
     }
 }

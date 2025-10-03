@@ -152,7 +152,7 @@ const PeerConnect = () => {
                                 type="tel"
                                 pattern="[0-9]*"
                                 inputMode="numeric"
-                                placeholder="Enter peer ID or URL"
+                                placeholder="Enter peer ID"
                                 value={targetId}
                                 onChange={(e) => setTargetId(e.target.value)}
                                 onKeyDown={handleKeyDown}

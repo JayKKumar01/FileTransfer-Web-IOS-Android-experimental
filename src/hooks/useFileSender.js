@@ -15,7 +15,6 @@ export const useFileSender = (files, updateFile) => {
     const { connection, isConnectionReady } = usePeer();
 
     const currentFileRef = useRef(null);
-    const uiThrottleRef = useRef(0);
 
     // -------------------- Refill buffer --------------------
     const refillBuffer = async (file) => {
@@ -78,9 +77,9 @@ export const useFileSender = (files, updateFile) => {
         file._buffer = null;
         file._bufferOffset = 0;
         file._fileOffset = 0;
+        file._uiThrottle = 0;
 
         currentFileRef.current = file;
-        uiThrottleRef.current = 0;
 
         updateFile(file.id, { state: "sending", progress: 0, speed: 0 });
         console.log(`📤 Starting file transfer: "${file.metadata.name}"`);
@@ -119,7 +118,7 @@ export const useFileSender = (files, updateFile) => {
 
         // Throttle UI updates
         const now = performance.now();
-        if (now - uiThrottleRef.current >= UI_UPDATE_INTERVAL) {
+        if (now - file._uiThrottle >= UI_UPDATE_INTERVAL) {
             const delta = (now - file._speed.lastTime) / 1000;
             const sentSinceLast = file._bytesSent - (file._speed.lastTotal || 0);
             const speed = delta > 0 ? sentSinceLast / delta : 0;
@@ -140,7 +139,7 @@ export const useFileSender = (files, updateFile) => {
 
             file._speed.lastTime = now;
             file._speed.lastTotal = file._bytesSent;
-            uiThrottleRef.current = now;
+            file._uiThrottle = now;
         }
     };
 

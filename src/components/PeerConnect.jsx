@@ -2,7 +2,8 @@ import "../styles/PeerConnect.css";
 import React, { useState, useEffect } from "react";
 import { usePeer } from "../contexts/PeerContext";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check } from "lucide-react"; // ✅ Lucide icons
+import { Copy, Check } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react"; // ✅ QR generator
 
 const PeerConnect = () => {
     const { peerId, connectToPeer, isPeerReady, isConnectionReady, remoteId } = usePeer();
@@ -17,7 +18,6 @@ const PeerConnect = () => {
             setTargetId("");
             setStatus("Connected ✅");
 
-            // brief delay to show "Connected ✅"
             const timer = setTimeout(() => navigate("/files"), 500);
             return () => clearTimeout(timer);
         }
@@ -30,11 +30,8 @@ const PeerConnect = () => {
         setStatus("Connecting...");
 
         connectToPeer(targetId, (state) => {
-            if (state?.startsWith("Retrying")) {
-                setStatus(state);
-            } else if (state === "failed") {
-                setStatus("Connect");
-            }
+            if (state?.startsWith("Retrying")) setStatus(state);
+            else if (state === "failed") setStatus("Connect");
         });
     };
 
@@ -47,7 +44,7 @@ const PeerConnect = () => {
     const copyToClipboard = () => {
         navigator.clipboard.writeText(peerId).then(() => {
             setCopied(true);
-            setTimeout(() => setCopied(false), 800); // show check for 800ms
+            setTimeout(() => setCopied(false), 800);
         }).catch(() => {
             alert("Failed to copy ID");
         });
@@ -55,6 +52,11 @@ const PeerConnect = () => {
 
     return (
         <div className="PeerConnect">
+            {/* ✅ QR code for peerId */}
+            <div className="qr-container">
+                <QRCodeCanvas value={`${peerId || ""}`} size={120} bgColor="#1a1a1a" fgColor="#ffffff" />
+            </div>
+
             <p className="id-row">
                 Your ID: <b>{peerId}</b>
                 <button
@@ -64,7 +66,6 @@ const PeerConnect = () => {
                     {copied ? <Check size={16} /> : <Copy size={16} />}
                 </button>
             </p>
-
 
             {!isConnectionReady ? (
                 <>

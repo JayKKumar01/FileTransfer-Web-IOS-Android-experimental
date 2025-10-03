@@ -1,9 +1,9 @@
-/* Root container fills parent */
+/* Root container */
 .PeerConnect {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start; /* ✅ keep natural top flow */
     height: 100%;
     width: 100%;
     box-sizing: border-box;
@@ -11,15 +11,28 @@
     background-color: #1a1a1a;
     border-radius: 12px;
     color: #ffffff;
-    overflow: hidden;
+    overflow-y: auto; /* ✅ handles smaller screens */
+    text-align: center;
+}
+
+/* QR Code wrapper */
+.PeerConnect .qr-wrapper {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: #121212;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 /* Your ID row */
 .PeerConnect .id-row {
     display: flex;
-    align-items: center;  /* ✅ vertically centers text & button */
+    align-items: center;
+    justify-content: center;
     gap: 0.5rem;
-    margin: 0 0 1rem 0;
+    margin-bottom: 1rem;
     font-weight: 500;
     font-size: 1rem;
     word-break: break-word;
@@ -27,9 +40,9 @@
 
 /* Input field */
 .PeerConnect input {
-    width: 80%;
-    max-width: 250px;
-    padding: 0.5rem 0.75rem;
+    width: 100%;
+    max-width: 280px;
+    padding: 0.6rem 0.8rem;
     margin-bottom: 1rem;
     border-radius: 8px;
     border: 1px solid #333;
@@ -37,6 +50,12 @@
     color: #ffffff;
     font-size: 1rem;
     box-sizing: border-box;
+    outline: none;
+    transition: border 0.2s ease;
+}
+
+.PeerConnect input:focus {
+    border-color: #2575fc;
 }
 
 .PeerConnect input::placeholder {
@@ -45,18 +64,22 @@
 
 /* Connect button */
 .PeerConnect button {
-    padding: 0.55rem 1.2rem;
+    padding: 0.6rem 1.2rem;
     border-radius: 8px;
     border: none;
     background-color: #2575fc;
     color: white;
     font-size: 1rem;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 .PeerConnect button:hover {
     background-color: #1a5edb;
+}
+
+.PeerConnect button:active {
+    transform: scale(0.97);
 }
 
 /* Copy button (small + modern) */
@@ -67,7 +90,7 @@
     padding: 0.3rem 0.6rem;
     border-radius: 6px;
     cursor: pointer;
-    display: flex;          /* ✅ ensures icon centers inside */
+    display: flex;
     align-items: center;
     justify-content: center;
     transition: background-color 0.2s ease, color 0.2s ease;
@@ -80,7 +103,7 @@
 
 /* Copy animation */
 .PeerConnect .copy-btn.copied {
-    background-color: #28a745 !important; /* green */
+    background-color: #28a745 !important;
     color: #fff !important;
     animation: popFade 0.8s ease forwards;
 }
@@ -98,8 +121,12 @@
         padding: 0.8rem;
     }
 
+    .PeerConnect .qr-wrapper {
+        margin-bottom: 0.8rem;
+    }
+
     .PeerConnect input {
-        width: 90%;
+        width: 95%;
         font-size: 0.95rem;
     }
 

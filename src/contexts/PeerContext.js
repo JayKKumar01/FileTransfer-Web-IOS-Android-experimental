@@ -20,7 +20,8 @@ export const PeerProvider = ({ children }) => {
     const refs = useRef({
         peer: null,
         conn: null,
-        pendingTarget: null,
+        pendingTarget: null, // target peer we are trying to connect
+        lastConnectedPeerId: null, // last successfully connected peer
         retryCount: 0
     });
 
@@ -55,6 +56,7 @@ export const PeerProvider = ({ children }) => {
             setIsConnectionReady(true);
             setConnectionStatus("connected");
             refs.current.pendingTarget = null;
+            refs.current.lastConnectedPeerId = rid;
             refs.current.retryCount = 0;
         });
 
@@ -78,6 +80,13 @@ export const PeerProvider = ({ children }) => {
         peer.on("open", (id) => {
             log(`Peer opened: ${id.replace(PREFIX, "")}`);
             setIsPeerReady(true);
+
+            // After peer-level reconnect, try to reconnect last peer if it existed
+            const lastPeer = refs.current.lastConnectedPeerId;
+            if (lastPeer) {
+                log(`Reconnecting to last connected peer ${lastPeer}...`);
+                connectToPeer(lastPeer);
+            }
         });
 
         peer.on("connection", (incomingConn) => {
@@ -95,11 +104,11 @@ export const PeerProvider = ({ children }) => {
 
         peer.on("close", () => log("Peer closed – please refresh."));
 
-        // Handle peer errors with retry for peer-unavailable
         peer.on("error", (err) => {
             log(`Peer error: ${err.type || err}`);
             const targetId = refs.current.pendingTarget;
 
+            // Retry logic for peer-unavailable
             if (err?.type === "peer-unavailable" && targetId) {
                 if (refs.current.retryCount < 5) {
                     refs.current.retryCount++;

@@ -78,8 +78,8 @@ export const PeerProvider = ({ children }) => {
         if (!targetId || !peerRef.current) return;
 
         log(`Trying to connect with ID: ${targetId}`);
-        const maxRetries = 10;
-        const retryInterval = 2000;
+        const retryInterval = 4;
+        const maxRetries = 20 / retryInterval;
         let attempts = 0;
         let connRef = null;
 
@@ -99,13 +99,13 @@ export const PeerProvider = ({ children }) => {
                     attempts++;
                     if (attempts < maxRetries) {
                         callback?.(`Retrying... (${attempts}/${maxRetries})`);
-                        setTimeout(attemptConnection, retryInterval);
+                        setTimeout(attemptConnection, retryInterval * 1000);
                     } else {
                         log(`Failed to connect to ${targetId}`);
                         callback?.("failed");
                     }
                 }
-            }, 2000);
+            }, retryInterval * 1000);
         };
 
         attemptConnection();

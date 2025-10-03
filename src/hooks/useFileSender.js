@@ -92,14 +92,14 @@ export const useFileSender = (files, updateFile) => {
         const file = currentFileRef.current;
         if (!file) return;
 
+        // clear refs
+        currentFileRef.current = null;
+
         updateFile(file.id, {
             state: "sent",
             progress: file.metadata.size,
             speed: 0,
         });
-
-        // clear refs
-        currentFileRef.current = null;
 
         console.log(`🎉 File transfer completed: "${file.metadata.name}"`);
     };

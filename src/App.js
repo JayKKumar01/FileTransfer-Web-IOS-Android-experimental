@@ -95,12 +95,6 @@ export default App;
 //reconnect, even when connection is closed, mark who entered targetId to connect
 // reconnect is pending too, if connection is not null, then reconnect and connect to peer, on connection no need
 
-// use some dsa to reduce time complexity
-
-// just cross check if new send chunk is slow
-
 //qr idea to connect peers
 
 // copy share link
-
-// no individual 4gb+ for zip, warn for 4gb+ combined, only donwload first 4gb

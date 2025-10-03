@@ -4,18 +4,21 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%; /* takes full height allocated by parent */
-    width: 100%; /* fills parent width */
+    height: 100%;
+    width: 100%;
     box-sizing: border-box;
     padding: 1rem;
-    background-color: #1a1a1a; /* slightly lighter dark background */
-    border-radius: 12px; /* subtle rounding */
+    background-color: #1a1a1a;
+    border-radius: 12px;
     color: #ffffff;
     overflow: hidden;
 }
 
-/* Your ID display */
-.PeerConnect p {
+/* Your ID row */
+.PeerConnect .id-row {
+    display: flex;
+    align-items: center;  /* ✅ vertically centers text & button */
+    gap: 0.5rem;
     margin: 0 0 1rem 0;
     font-weight: 500;
     font-size: 1rem;
@@ -56,7 +59,40 @@
     background-color: #1a5edb;
 }
 
-/* Responsive adjustments for mobile */
+/* Copy button (small + modern) */
+.PeerConnect .copy-btn {
+    background-color: #333;
+    color: #ddd;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;          /* ✅ ensures icon centers inside */
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.PeerConnect .copy-btn:hover {
+    background-color: #444;
+    color: #fff;
+}
+
+/* Copy animation */
+.PeerConnect .copy-btn.copied {
+    background-color: #28a745 !important; /* green */
+    color: #fff !important;
+    animation: popFade 0.8s ease forwards;
+}
+
+@keyframes popFade {
+    0% { transform: scale(1); opacity: 1; }
+    30% { transform: scale(1.15); opacity: 1; }
+    70% { transform: scale(0.95); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.9; }
+}
+
+/* Responsive adjustments */
 @media (max-width: 480px) {
     .PeerConnect {
         padding: 0.8rem;
@@ -70,5 +106,10 @@
     .PeerConnect button {
         font-size: 0.95rem;
         padding: 0.5rem 1rem;
+    }
+
+    .PeerConnect .copy-btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
     }
 }

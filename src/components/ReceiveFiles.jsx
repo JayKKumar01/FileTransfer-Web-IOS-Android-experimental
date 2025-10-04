@@ -15,7 +15,7 @@ const ReceiveFiles = () => {
 
     // Count of completed downloads
     const completedCount = useMemo(
-        () => downloads.filter(d => d.status.state === "received").length,
+        () => downloads.filter(d => d.status.state === "received" || d.status.state === "downloaded").length,
         [downloads]
     );
 

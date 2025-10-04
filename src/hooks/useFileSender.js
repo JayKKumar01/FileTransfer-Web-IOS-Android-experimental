@@ -4,8 +4,8 @@ import { isApple } from "../utils/osUtil";
 import { crc32 } from "../utils/zipUtil";
 
 const CHUNK_SIZE = 256 * 1024; // 256 KB
-const APPLE_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB for iOS/macOS (fixed comment)
-const DEFAULT_BUFFER_SIZE = 8 * 1024 * 1024; // 8 MB for Android/others
+const APPLE_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB
+const DEFAULT_BUFFER_SIZE = 8 * 1024 * 1024; // 8 MB
 const BUFFER_SIZE = isApple() ? APPLE_BUFFER_SIZE : DEFAULT_BUFFER_SIZE;
 
 const UPS = 3; // UI updates per second
@@ -13,10 +13,9 @@ const UI_UPDATE_INTERVAL = 1000 / UPS;
 
 export const useFileSender = (files, updateFile) => {
     const { connection, isConnectionReady } = usePeer();
-
     const currentFileRef = useRef(null);
+    const isPausedRef = useRef(false); // Track if sending is paused
 
-    // -------------------- Refill buffer --------------------
     const refillBuffer = async (file) => {
         const remaining = file.metadata.size - file._fileOffset;
         if (remaining <= 0) return false;
@@ -33,10 +32,9 @@ export const useFileSender = (files, updateFile) => {
         return true;
     };
 
-    // -------------------- Send one chunk --------------------
     const sendChunk = async () => {
         const file = currentFileRef.current;
-        if (!file || !connection) return;
+        if (!file || !connection || isPausedRef.current) return;
 
         if (!file._buffer || file._bufferOffset >= file._buffer.byteLengthUsed) {
             const hasMore = await refillBuffer(file);
@@ -69,9 +67,7 @@ export const useFileSender = (files, updateFile) => {
         });
     };
 
-    // -------------------- Start transfer --------------------
     const startFileTransfer = (file) => {
-        // attach transfer state directly to file object
         file._bytesSent = 0;
         file._speed = { lastTime: performance.now(), lastTotal: 0 };
         file._buffer = null;
@@ -80,21 +76,19 @@ export const useFileSender = (files, updateFile) => {
         file._uiThrottle = 0;
 
         currentFileRef.current = file;
+        isPausedRef.current = !isConnectionReady; // pause if connection not ready
 
         updateFile(file.id, { state: "sending", progress: 0, speed: 0 });
         console.log(`📤 Starting file transfer: "${file.metadata.name}"`);
 
-        sendChunk().catch(console.error);
+        if (isConnectionReady) sendChunk().catch(console.error);
     };
 
-    // -------------------- Finish transfer --------------------
     const finishFile = () => {
         const file = currentFileRef.current;
         if (!file) return;
 
-        // clear refs
         currentFileRef.current = null;
-
         updateFile(file.id, {
             state: "sent",
             progress: file.metadata.size,
@@ -104,7 +98,6 @@ export const useFileSender = (files, updateFile) => {
         console.log(`🎉 File transfer completed: "${file.metadata.name}"`);
     };
 
-    // -------------------- ACK handling --------------------
     const processAck = (ack) => {
         const file = currentFileRef.current;
         if (!file || ack.fileId !== file.id) return;
@@ -114,9 +107,8 @@ export const useFileSender = (files, updateFile) => {
             return;
         }
 
-        sendChunk().catch(console.error);
+        if (!isPausedRef.current) sendChunk().catch(console.error);
 
-        // Throttle UI updates
         const now = performance.now();
         if (now - file._uiThrottle >= UI_UPDATE_INTERVAL) {
             const delta = (now - file._speed.lastTime) / 1000;
@@ -145,10 +137,22 @@ export const useFileSender = (files, updateFile) => {
 
     // -------------------- Effects --------------------
     useEffect(() => {
-        if (!isConnectionReady || currentFileRef.current != null) return;
-        const nextFile = files.find((f) => f.status.state === "waiting");
-        if (nextFile) startFileTransfer(nextFile);
-    }, [files, isConnectionReady]);
+        if (currentFileRef.current && !isConnectionReady) {
+            console.log("⏸️ Pausing file transfer due to connection loss");
+            isPausedRef.current = true;
+        } else if (currentFileRef.current && isConnectionReady && isPausedRef.current) {
+            console.log("▶️ Resuming file transfer");
+            isPausedRef.current = false;
+            sendChunk().catch(console.error);
+        }
+    }, [isConnectionReady]);
+
+    useEffect(() => {
+        if (!currentFileRef.current) {
+            const nextFile = files.find((f) => f.status.state === "waiting");
+            if (nextFile) startFileTransfer(nextFile);
+        }
+    }, [files]);
 
     useEffect(() => {
         if (!connection) return;

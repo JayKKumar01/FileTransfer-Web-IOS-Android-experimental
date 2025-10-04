@@ -25,7 +25,7 @@ export const useFileReceiver = (downloads, updateDownload) => {
             if (!download) return;
 
             // -------------------- Send ACK --------------------
-            connection.send({ type: "ack", fileId, chunkIndex });
+            connection.send({ type: "ack", fileId, chunkIndex});
 
             // -------------------- Update tracking --------------------
             download.trackingManager.addBytes(chunk.byteLength);

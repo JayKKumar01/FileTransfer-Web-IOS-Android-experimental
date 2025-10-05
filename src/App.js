@@ -80,7 +80,7 @@ function App() {
 
             {isConnectionLost && (
                 <div className="app-connection-lost">
-                    Connection lost — please save your received files and start a new session.
+                    Connection lost — {isApple() && "please save your received files and "}start a new session.
                 </div>
             )}
 

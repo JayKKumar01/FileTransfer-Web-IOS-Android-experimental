@@ -4,11 +4,13 @@ import { FileContext } from "../contexts/FileContext";
 import { isApple } from "../utils/osUtil";
 import { downloadZip } from "../utils/zipUtil";
 import ReceiveFileItem from "./ReceiveFileItem";
+import {usePeer} from "../contexts/PeerContext";
 
 const MAX_ZIP_TOTAL = 4 * 1024 ** 3; // 4 GB
 
 const ReceiveFiles = () => {
     const { downloads, removeDownload } = useContext(FileContext);
+    const { isConnectionLost } = usePeer();
     const itemRefs = useRef({});
     const [zipProgress, setZipProgress] = useState(0);
     const [zippedIds, setZippedIds] = useState(new Set());
@@ -127,15 +129,17 @@ const ReceiveFiles = () => {
                 </div>
             )}
 
-            {isApple() && downloads.length > 1 && !zipProgress && allReceived && (
-                <button
-                    className="download-all-zip-btn"
-                    onClick={handleDownloadAll}
-                    title="Download All as ZIP"
-                >
-                    Download All as ZIP
-                </button>
-            )}
+            {isApple() && downloads.length > 1 && !zipProgress &&
+                (isConnectionLost ? completedCount > 1 : allReceived) && (
+                    <button
+                        className="download-all-zip-btn"
+                        onClick={handleDownloadAll}
+                        title="Download All as ZIP"
+                    >
+                        Download All as ZIP
+                    </button>
+                )
+            }
         </div>
     );
 };

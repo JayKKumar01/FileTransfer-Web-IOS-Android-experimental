@@ -18,6 +18,7 @@ export const PeerProvider = ({ children }) => {
     const [isConnectionReady, setIsConnectionReady] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState("idle"); // idle | connecting | connected | retrying
     const [peerDevice, setPeerDevice] = useState(null);
+    const [isConnectionLost, setIsConnectionLost] = useState(false);
 
     const refs = useRef({
         peer: null,
@@ -52,6 +53,7 @@ export const PeerProvider = ({ children }) => {
         setConnectionStatus("connecting");
 
         conn.on("open", () => {
+            setIsConnectionLost(false);
             conn.send({
                 type: "deviceInfo",
                 device: isApple() ? "iOS" : isAndroid() ? "Android" : "unknown",
@@ -76,6 +78,7 @@ export const PeerProvider = ({ children }) => {
         conn.on("close", () => {
             log("Connection closed");
             cleanupConnection();
+            setIsConnectionLost(true);
         });
 
         conn.on("error", (err) => {
@@ -111,8 +114,12 @@ export const PeerProvider = ({ children }) => {
         peer.on("disconnected", () => {
             log("Peer disconnected");
             setIsPeerReady(false);
+            if (isConnectionReady){
+                setIsConnectionLost(true);
+            }else {
+                peer.reconnect();
+            }
             cleanupConnection();
-            peer.reconnect();
         });
 
         peer.on("close", () => log("Peer closed – please refresh."));
@@ -184,6 +191,7 @@ export const PeerProvider = ({ children }) => {
                 connectToPeer,
                 reconnect,
                 peerDevice,
+                isConnectionLost,
             }}
         >
             {children}

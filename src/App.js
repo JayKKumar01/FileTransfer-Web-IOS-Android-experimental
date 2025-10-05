@@ -20,6 +20,7 @@ function App() {
     const location = useLocation();
     const [initialized, setInitialized] = useState(false);
     const [pendingRemoteId, setPendingRemoteId] = useState(null); // store remoteId until user clicks
+    const { isConnectionLost } = usePeer();
 
     // Log platform
     useEffect(() => {
@@ -77,6 +78,14 @@ function App() {
                 <h1>FileTransfer-Web-IOS-Android</h1>
             </header>
 
+            {isConnectionLost && (
+                <div className="app-connection-lost">
+                    Connection lost — please save your received files and start a new session.
+                </div>
+            )}
+
+
+
             <main className="App-content">
                 {!initialized ? (
                     <button className="App-init-button" onClick={handleButtonClick}>
@@ -97,31 +106,17 @@ function App() {
 
             {showTabBar && <TabBar />}
 
-            <footer className="App-footer">
-                <textarea
-                    ref={logRef}
-                    readOnly
-                    className="App-log"
-                    value={logMessages.join("\n")}
-                    placeholder="Logs will appear here..."
-                />
-            </footer>
+            {/*<footer className="App-footer">*/}
+            {/*    <textarea*/}
+            {/*        ref={logRef}*/}
+            {/*        readOnly*/}
+            {/*        className="App-log"*/}
+            {/*        value={logMessages.join("\n")}*/}
+            {/*        placeholder="Logs will appear here..."*/}
+            {/*    />*/}
+            {/*</footer>*/}
         </div>
     );
 }
 
 export default App;
-
-// don't delete my comments
-
-// reconnect, even when connection is closed, mark who entered targetId to connect
-// reconnect is pending too, if connection is not null, then reconnect and connect to peer, on connection no need
-
-// qr idea to connect peers
-
-// copy share link
-
-//think of zip, if no connection give option for the current ones
-
-// map for each file each chunk, on ack received, marked as success, on reconnection resume from that only, one connection loose
-//just pause, send full map to receiver on metadata so that it does not duplicate the chunk for which sender was not notified

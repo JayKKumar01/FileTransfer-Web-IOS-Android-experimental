@@ -74,9 +74,21 @@ function App() {
 
     return (
         <div className="App">
-            <header className="App-header">
+            <header
+                className="App-header"
+                onClick={() => {
+                    const href = window.location.origin + window.location.pathname;
+                    console.log("Redirecting to:", href);
+                    setTimeout(() => {
+                        window.location.href = href;
+                    }, 1000); // 1 second delay
+                }}
+                style={{ cursor: "pointer" }}
+            >
                 <h1>FileTransfer-Web-IOS-Android</h1>
             </header>
+
+
 
             {isConnectionLost && (
                 <div className="app-connection-lost">

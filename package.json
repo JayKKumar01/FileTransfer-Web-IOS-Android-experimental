@@ -2,7 +2,7 @@
   "name": "filetransfer-web-ios-android",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://JayKKumar01.github.io/FileTransfer-Web-IOS-Android",
+  "homepage": "https://JayKKumar01.github.io/FileTransfer-Web-IOS-Android-experimental",
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.8.0",

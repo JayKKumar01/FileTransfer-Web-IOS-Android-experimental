@@ -1,70 +1,179 @@
-# Getting Started with Create React App
+# FileTransfer Web Application - iOS and Android
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Live Demo
 
-## Available Scripts
+🚀 **Try it now:** [FileTransfer-Web-IOS-Android](https://jaykkumar01.github.io/FileTransfer-Web-IOS-Android/) – access instantly without any setup.
+---
 
-In the project directory, you can run:
+## Overview
 
-### `npm start`
+This web application enables **peer-to-peer file transfer** using PeerJS and works seamlessly on **both iOS and Android devices**.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Its **main highlight** is the combination of **QR code-based peer connection** and **seamless cross-platform file transfer**, which allows users to send files **super easily, without any quality loss**, and **without relying on cloud storage**. The workflow is designed to be **smooth, fast, and intuitive**, making file sharing between iOS and Android devices effortless.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Key capabilities include:
 
-### `npm test`
+* **Instant QR code-based peer connection** for super-fast setup without typing IDs.
+* **Cross-platform file transfer** between iOS and Android with original file quality preserved.
+* **Send and receive multiple files simultaneously**, including large files.
+* **Dynamic file chunking** to optimize transfer speed.
+* **Optional ZIP compression** for received files (up to 4 GB on iOS).
+* **Platform-specific optimizations** for iOS (prevent pinch/zoom, viewport adjustments, Wake Lock API).
+* **Real-time transfer progress and speed monitoring**.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## Features
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| Feature                             | Description                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| **QR Code Peer Connection**         | Instantly connect devices using QR codes — no typing required.                   |
+| **Seamless iOS ↔ Android Transfer** | Super simple cross-platform file sharing while preserving original file quality. |
+| Multi-File Support                  | Send multiple files at once without compressing by default.                      |
+| Real-Time Progress                  | Monitor per-file transfer progress and speed dynamically.                        |
+| ZIP Download                        | Compress received files into a single ZIP archive (up to 4 GB on iOS).           |
+| iOS Optimizations                   | Prevent pinch/zoom, adjust viewport height, and keep the screen awake.           |
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Table of Contents
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. [Installation](#installation)
+2. [Usage](#usage)
+3. [File Flow](#file-flow)
+4. [Project Structure](#project-structure)
+5. [Utilities](#utilities)
+6. [Known Limitations](#known-limitations)
+7. [Contributing](#contributing)
+8. [License](#license)
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Installation
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+This project is fully hosted and **does not require any installation** for basic usage. Just open the live demo in your browser on iOS or Android:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+[FileTransfer Web App](https://jaykkumar01.github.io/FileTransfer-Web-IOS-Android/)
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+If you want to run locally:
 
-## Learn More
+```bash
+git clone https://github.com/jaykkumar01/FileTransfer-Web-IOS-Android.git
+cd FileTransfer-Web-IOS-Android
+npm install
+npm start
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Open [http://localhost:3000](http://localhost:3000) in your mobile browser.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+---
 
-### Code Splitting
+## Usage
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. **Initialize App**
 
-### Analyzing the Bundle Size
+    * Tap **“Keep Screen Awake & Initialize”** to enable Wake Lock (prevents device from sleeping during transfer).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+2. **Connect via QR Code**
 
-### Making a Progressive Web App
+    * One device generates a QR code.
+    * Scan the QR code on the other device.
+    * Devices are now connected instantly without typing long IDs.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+3. **Select Files to Send**
 
-### Advanced Configuration
+    * On the sending device, select one or more files.
+    * Proceed to the **Send** screen.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+4. **Monitor Transfer**
 
-### Deployment
+    * Real-time progress bars and speed indicators show the status of each file.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+5. **Receive Files**
 
-### `npm run build` fails to minify
+    * The receiving device can monitor progress.
+    * Optionally download multiple files as a ZIP archive (up to 4 GB on iOS).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+6. **Cross-Platform**
+
+    * Works flawlessly between iOS and Android.
+    * Original file quality is always preserved.
+
+---
+
+## File Flow
+
+1. **File Selection**
+
+    * User selects files via the `FileInput` component.
+    * Files are added to the context for state management.
+
+2. **Sending Files**
+
+    * Files are chunked dynamically based on device and network speed.
+    * Progress is tracked using `createTrackingManager`.
+
+3. **Receiving Files**
+
+    * Files arrive in real-time.
+    * Optionally, multiple files can be compressed into a ZIP using `downloadZip`.
+
+4. **Completion**
+
+    * All files are available to view or download in full original quality.
+
+---
+
+## Project Structure
+
+```
+src/
+├─ components/
+│  ├─ FileInput.jsx         # File selection UI
+│  ├─ PeerConnect.jsx       # QR code & manual peer connection
+│  ├─ QRScanner.jsx         # QR scanning component
+│  ├─ SendFiles.jsx         # Display files being sent
+│  ├─ ReceiveFiles.jsx      # Display files being received
+│  └─ TabBar.jsx            # Bottom navigation
+├─ contexts/
+│  ├─ FileContext.jsx       # Manage files and downloads
+│  ├─ LogContext.jsx        # Central logging
+│  └─ PeerContext.jsx       # PeerJS connection context
+├─ utils/
+│  ├─ osUtil.js             # Detect Apple/Android & prevent pinch zoom
+│  ├─ zipUtil.js            # ZIP file creation and download
+│  ├─ wakeLock.js           # Wake Lock handling
+│  └─ fileUtil.js           # File formatting helpers
+└─ App.jsx                  # Main app routing & initialization
+```
+
+---
+
+## Utilities
+
+* **`osUtil.js`** – Detects Apple/Android devices, handles iOS viewport & pinch prevention.
+* **`wakeLock.js`** – Requests and maintains Wake Lock to keep screen awake.
+* **`zipUtil.js`** – Creates ZIP archives for multiple files with progress tracking.
+* **`fileUtil.js`** – File size formatting and helper functions.
+
+---
+
+## Known Limitations
+
+* **ZIP downloads on iOS** limited to **4 GB total** per archive.
+* Background tab suspension on iOS may interrupt transfers in Safari.
+* Android browsers may require camera permissions for QR scanning.
+
+---
+
+## Contributing
+
+1. Fork the repo.
+2. Create a new branch for your feature/bugfix.
+3. Submit a pull request with a clear description.
+
+---
+
+## License
+
+MIT License.
+
+---
